@@ -198,8 +198,8 @@ class SteeringLayoutMici(NavScroller):
     self._blinker_toggle.refresh()
     self._blinker_speed.refresh()
     self._blinker_delay.refresh()
-    self._blinker_speed.set_enabled(lambda: self._blinker_toggle.is_checked)
-    self._blinker_delay.set_enabled(lambda: self._blinker_toggle.is_checked)
+    self._blinker_speed.set_enabled(lambda: self._blinker_toggle._checked)
+    self._blinker_delay.set_enabled(lambda: self._blinker_toggle._checked)
 
   def _update_torque_state(self, torque_allowed: bool, enforce_torque: bool, self_tune_on: bool, custom_on: bool):
     if not self_tune_on and self._prev_self_tune_on is not False:
@@ -236,7 +236,7 @@ class SteeringLayoutMici(NavScroller):
       self._tq_self_tune.refresh()
       self._tq_relaxed.refresh()
       self._tq_self_tune.set_enabled(offroad)
-      self._tq_relaxed.set_enabled(lambda: self._tq_self_tune.is_checked)
+      self._tq_relaxed.set_enabled(lambda: self._tq_self_tune._checked)
 
     if gui_app.widget_in_stack(self._tq_custom_view):
       self._tq_custom.refresh()
@@ -244,6 +244,6 @@ class SteeringLayoutMici(NavScroller):
       self._tq_lat_accel.refresh()
       self._tq_friction.refresh()
       self._tq_custom.set_enabled(offroad)
-      self._tq_manual_rt.set_enabled(lambda: self._tq_custom.is_checked)
-      self._tq_lat_accel.set_enabled(lambda: self._tq_custom.is_checked)
-      self._tq_friction.set_enabled(lambda: self._tq_custom.is_checked)
+      self._tq_manual_rt.set_enabled(lambda: self._tq_custom._checked)
+      self._tq_lat_accel.set_enabled(lambda: self._tq_custom._checked)
+      self._tq_friction.set_enabled(lambda: self._tq_custom._checked)

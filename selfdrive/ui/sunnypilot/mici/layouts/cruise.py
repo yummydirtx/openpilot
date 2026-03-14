@@ -102,7 +102,7 @@ class CruiseLayoutMici(NavScroller):
     offroad = ui_state.is_offroad()
     icbm_available = cp_ready and ui_state.CP_SP.intelligentCruiseButtonManagementAvailable and not has_long
     # Compute from toggle state directly — avoids 5s update_params delay
-    has_icbm = icbm_available and self._icbm_toggle.is_checked
+    has_icbm = icbm_available and self._icbm_toggle._checked
 
     self._icbm_toggle.set_enabled(icbm_available and offroad)
     self._dec_toggle.set_enabled(has_long)
@@ -163,8 +163,8 @@ class CruiseLayoutMici(NavScroller):
     self._acc_long.refresh()
     self._custom_acc_toggle.set_enabled(self._custom_acc_btn.enabled)
     # Lambda: short/long respond same-frame when toggle is tapped (see button.py docstring)
-    self._acc_short.set_enabled(lambda: self._custom_acc_btn.enabled and self._custom_acc_toggle.is_checked)
-    self._acc_long.set_enabled(lambda: self._custom_acc_btn.enabled and self._custom_acc_toggle.is_checked)
+    self._acc_short.set_enabled(lambda: self._custom_acc_btn.enabled and self._custom_acc_toggle._checked)
+    self._acc_long.set_enabled(lambda: self._custom_acc_btn.enabled and self._custom_acc_toggle._checked)
 
   def _update_speed_limit_state(self, cp_ready: bool, has_long: bool, has_icbm: bool, offset_type: int):
     # SLA availability gating (must always run)
