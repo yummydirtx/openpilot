@@ -71,7 +71,9 @@ class CruiseLayoutMici(NavScroller):
 
     # --- Custom ACC sub-panel ---
     self._custom_acc_toggle = BigParamControl("enable custom increments", "CustomAccIncrementsEnabled")
-    _speed_label = lambda v: f"{v} {speed_unit()}"
+
+    def _speed_label(v):
+      return f"{v} {speed_unit()}"
     self._acc_short = BigParamOption("short press", "CustomAccShortPressIncrement",
                                      min_value=1, max_value=10, label_callback=_speed_label, picker_unit=speed_unit)
     self._acc_long = BigParamOption("long press", "CustomAccLongPressIncrement",
@@ -100,7 +102,7 @@ class CruiseLayoutMici(NavScroller):
     offroad = ui_state.is_offroad()
     icbm_available = cp_ready and ui_state.CP_SP.intelligentCruiseButtonManagementAvailable and not has_long
     # Compute from toggle state directly — avoids 5s update_params delay
-    has_icbm = icbm_available and self._icbm_toggle._checked
+    has_icbm = icbm_available and self._icbm_toggle.is_checked
 
     self._icbm_toggle.set_enabled(icbm_available and offroad)
     self._dec_toggle.set_enabled(has_long)
@@ -161,8 +163,8 @@ class CruiseLayoutMici(NavScroller):
     self._acc_long.refresh()
     self._custom_acc_toggle.set_enabled(self._custom_acc_btn.enabled)
     # Lambda: short/long respond same-frame when toggle is tapped (see button.py docstring)
-    self._acc_short.set_enabled(lambda: self._custom_acc_btn.enabled and self._custom_acc_toggle._checked)
-    self._acc_long.set_enabled(lambda: self._custom_acc_btn.enabled and self._custom_acc_toggle._checked)
+    self._acc_short.set_enabled(lambda: self._custom_acc_btn.enabled and self._custom_acc_toggle.is_checked)
+    self._acc_long.set_enabled(lambda: self._custom_acc_btn.enabled and self._custom_acc_toggle.is_checked)
 
   def _update_speed_limit_state(self, cp_ready: bool, has_long: bool, has_icbm: bool, offset_type: int):
     # SLA availability gating (must always run)
