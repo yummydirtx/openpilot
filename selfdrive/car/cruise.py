@@ -51,8 +51,10 @@ class VCruiseHelper(VCruiseHelperSP):
     _enabled = self.update_enabled_state(CS, enabled)
 
     if CS.cruiseState.available:
-      if not self.CP.pcmCruise or (not self.CP_SP.pcmCruiseSpeed and _enabled):
-        # if stock cruise is completely disabled, then we can use our own set speed logic
+      if not self.CP_SP.pcmCruiseSpeed and (not self.CP.pcmCruise or _enabled):
+        # Some OP-long ports still preserve a stock set-speed signal even though
+        # the PCM no longer owns longitudinal. Only fall back to non-PCM target
+        # management when no stock set-speed source is available.
         self._update_v_cruise_non_pcm(CS, _enabled, is_metric)
         self.update_speed_limit_assist_v_cruise_non_pcm()
         self.v_cruise_cluster_kph = self.v_cruise_kph
@@ -139,6 +141,18 @@ class VCruiseHelper(VCruiseHelperSP):
         self.button_change_states[b.type.raw] = {"standstill": CS.cruiseState.standstill, "enabled": enabled}
 
   def initialize_v_cruise(self, CS, experimental_mode: bool, dynamic_experimental_control: bool) -> None:
+    # Prefer a stock set-speed signal when one is available, even on OP-long cars.
+    if self.CP_SP.pcmCruiseSpeed:
+      self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
+      self.v_cruise_cluster_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
+      if CS.cruiseState.speed == 0:
+        self.v_cruise_kph = V_CRUISE_UNSET
+        self.v_cruise_cluster_kph = V_CRUISE_UNSET
+      elif CS.cruiseState.speed == -1:
+        self.v_cruise_kph = -1
+        self.v_cruise_cluster_kph = -1
+      return
+
     # initializing is handled by the PCM
     if self.CP.pcmCruise:
       return
