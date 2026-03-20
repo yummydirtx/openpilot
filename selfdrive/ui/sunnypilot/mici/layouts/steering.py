@@ -13,7 +13,7 @@ from openpilot.selfdrive.ui.sunnypilot.mici.widgets.button import (
   BigParamOption,
   speed_unit,
 )
-from openpilot.selfdrive.ui.sunnypilot.mici.widgets.scroller import NavScroller
+from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.mads.helpers import MadsSteeringModeOnBrake, get_mads_limited_brands
 from openpilot.system.ui.lib.application import gui_app
