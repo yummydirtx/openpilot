@@ -17,9 +17,6 @@ from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 
 RELAXED_MIN_BUCKET_POINTS = np.array([1, 200, 300, 500, 500, 300, 200, 1])
 
-# Extra brands enabled by sunnypilot on top of upstream ALLOWED_CARS
-EXTRA_ALLOWED_CARS = ['mazda']
-
 # Speed-binned learning constants (skip <3 m/s where lat_accel = v*yaw_rate is noisy)
 SPEED_BIN_BOUNDS = [(3, 8), (8, 14), (14, 20), (20, 26), (26, 40)]
 SPEED_BIN_CENTERS = [5.5, 11.0, 17.0, 23.0, 33.0]
@@ -48,10 +45,6 @@ class TorqueEstimatorExt:
     self.offline_friction = 0.0
 
   def initialize_custom_params(self, decimated=False):
-    # Extend upstream ALLOWED_CARS with SP-specific brands (runs after upstream __init__ sets use_params)
-    if not self.use_params and self.CP.brand in EXTRA_ALLOWED_CARS and self.CP.lateralTuning.which() == 'torque':
-      self.use_params = True
-
     self.update_use_params()
 
     if self.enforce_torque_control_toggle:
