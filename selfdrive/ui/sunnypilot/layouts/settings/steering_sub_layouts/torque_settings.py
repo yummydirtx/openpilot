@@ -61,8 +61,8 @@ class TorqueSettingsLayout(Widget):
     self._speed_dep_toggle = toggle_item_sp(
       param="SpeedDependentTorqueToggle",
       title=lambda: tr("Speed-Dependent Self-Tune (Beta)"),
-      description=lambda: tr("Learns separate torque parameters at different speeds. "
-                             "Improves steering at both low and high speeds for supported cars. "
+      description=lambda: tr("Learns separate torque parameters at different speeds. " +
+                             "Improves steering at both low and high speeds for supported cars. " +
                              "Requires a restart to take effect."),
     )
     self._custom_tune_toggle = toggle_item_sp(

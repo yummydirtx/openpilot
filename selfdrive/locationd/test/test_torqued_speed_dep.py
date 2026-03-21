@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Tests for speed-binned learning in torqued (vehicle-agnostic).
 
 Uses get_speed_dependent_torque_params() to discover configured cars.

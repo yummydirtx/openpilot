@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Tests for speed-dependent torque mechanism (vehicle-agnostic).
 
 Uses get_speed_dependent_torque_params() to discover configured cars from
