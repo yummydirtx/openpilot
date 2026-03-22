@@ -81,6 +81,8 @@ class TestSpeedBinnedLearning:
     for fingerprint in SPEED_DEP_CARS:
       est = TorqueEstimator(make_mock_CP(fingerprint=fingerprint))
       assert est.speed_binned
+      # Bins are lazy-initialized on first point
+      est._on_torque_point(0.1, 0.3, 10.0)
       assert len(est.speed_bin_points) == len(SPEED_BIN_BOUNDS)
 
   @patch(PATCH_EXT_PARAMS)
@@ -106,6 +108,8 @@ class TestSpeedBinnedLearning:
     _setup_ext_mock(mock_ext, speed_dep_on=True)
     for fingerprint in SPEED_DEP_CARS:
       est = TorqueEstimator(make_mock_CP(fingerprint=fingerprint))
+      # Trigger lazy bin init so _extend_msg populates fields
+      est._on_torque_point(0.1, 0.3, 10.0)
       msg = est.get_msg()
       ltp = msg.liveTorqueParameters
       assert len(ltp.speedBinCenters) == len(SPEED_BIN_CENTERS)

@@ -116,17 +116,34 @@ class TorqueEstimatorExt:
       for f in ref_frictions
     ]
 
+  def _ensure_speed_bins(self):
+    """Lazy init: create bins and restore cache on first use."""
+    if hasattr(self, 'speed_bin_points') and self._speed_bin_resets == self.resets:
+      return
+    self._speed_bin_resets = self.resets
+    self._post_reset()
+    # Restore from cache if available
+    try:
+      from cereal import log
+      cache = self._params.get("LiveTorqueParameters")
+      if cache:
+        with log.Event.from_bytes(cache) as evt:
+          self._restore_ext_cache(evt.liveTorqueParameters)
+    except Exception:
+      pass
+
   def _on_torque_point(self, steer, lateral_acc, vego):
     """Called from handle_log. Routes quality-filtered points to speed bins."""
     if not self.speed_binned:
       return
+    self._ensure_speed_bins()
     for i, (lo, hi) in enumerate(SPEED_BIN_BOUNDS):
       if lo <= vego < hi:
         self.speed_bin_points[i].add_point(steer, lateral_acc)
         break
 
   def _restore_ext_cache(self, cache_ltp):
-    """Called from cache restore. Restores per-bin filter values and points."""
+    """Restores per-bin filter values and points from cache."""
     if not self.speed_binned:
       return
     if (len(cache_ltp.speedBinLatAccelFactors) == len(SPEED_BIN_BOUNDS) and
@@ -172,7 +189,7 @@ class TorqueEstimatorExt:
 
   def _extend_msg(self, ltp, with_points):
     """Called from get_msg. Populates speed-bin fields in cereal message."""
-    if not self.speed_binned:
+    if not self.speed_binned or not hasattr(self, 'speed_bin_points'):
       return
     bin_results = self._estimate_params_speed_binned()
     bin_cal_percs = [float(self.speed_bin_points[i].get_valid_percent()) for i in range(len(SPEED_BIN_BOUNDS))]

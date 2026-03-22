@@ -122,7 +122,6 @@ class TorqueEstimator(ParameterEstimator, TorqueEstimatorExt):
           initial_params['points'] = cache_ltp.points
           self.decay = cache_ltp.decay
           self.filtered_points.load_points(initial_params['points'])
-          self._restore_ext_cache(cache_ltp)
           cloudlog.info("restored torque params from cache")
       except Exception:
         cloudlog.exception("failed to restore cached torque params")
@@ -150,7 +149,6 @@ class TorqueEstimator(ParameterEstimator, TorqueEstimatorExt):
                                          points_per_bucket=POINTS_PER_BUCKET,
                                          rowsize=3)
     self.all_torque_points = []
-    self._post_reset()
 
   def estimate_params(self):
     points = self.filtered_points.get_points(self.fit_points)
