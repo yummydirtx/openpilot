@@ -7,11 +7,11 @@ import numpy as np
 import pytest
 
 from unittest.mock import MagicMock  # noqa: TID251
-from opendbc.car.interfaces import get_speed_dependent_torque_params
+from opendbc.sunnypilot.car.interfaces import _get_speed_dep_config
 from opendbc.sunnypilot.car.interfaces import CarInterfaceBaseSP, LatControlInputs
 
 # Discover all cars with speed-dependent torque config
-SPEED_DEP_CARS = get_speed_dependent_torque_params()
+SPEED_DEP_CARS = _get_speed_dep_config()
 
 
 def make_ci(fingerprint):

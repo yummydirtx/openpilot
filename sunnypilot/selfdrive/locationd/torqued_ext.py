@@ -87,7 +87,7 @@ class TorqueEstimatorExt:
       return
 
     from openpilot.selfdrive.locationd.torqued import TorqueBuckets, STEER_BUCKET_BOUNDS, MIN_FILTER_DECAY
-    from opendbc.car.interfaces import get_speed_dependent_torque_params
+    from opendbc.sunnypilot.car.interfaces import _get_speed_dep_config
 
     self.speed_bin_points = [
       TorqueBuckets(x_bounds=STEER_BUCKET_BOUNDS,
@@ -98,7 +98,7 @@ class TorqueEstimatorExt:
       for _ in SPEED_BIN_BOUNDS
     ]
 
-    cfg = get_speed_dependent_torque_params().get(self.CP.carFingerprint, {})
+    cfg = _get_speed_dep_config().get(self.CP.carFingerprint, {})
     ref_lafs = cfg.get('laf_bp', [self.offline_latAccelFactor] * len(SPEED_BIN_BOUNDS))
     ref_frictions = cfg.get('friction_bp', [self.offline_friction] * len(SPEED_BIN_BOUNDS))
     self.speed_bin_decays = [MIN_FILTER_DECAY] * len(SPEED_BIN_BOUNDS)
