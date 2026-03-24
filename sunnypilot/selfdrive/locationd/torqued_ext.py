@@ -31,6 +31,24 @@ FRICTION_FACTOR = 1.5  # same as upstream
 
 
 class TorqueEstimatorExt:
+  """SP extension mixed into TorqueEstimator via multiple inheritance.
+
+  Adds per-speed-bin learning on top of upstream's single-value torqued.
+  Gated by SpeedDependentTorqueToggle (polled dynamically, no restart needed).
+
+  Data flow:
+    1. torqued calls _on_torque_point() for each quality-filtered sample → routed to speed bin
+    2. _estimate_params_speed_binned() runs independent SVD fit per bin (same algo as upstream)
+    3. _extend_msg() writes per-bin LAF/friction/valid/cal% to cereal message
+    4. controlsd_ext picks up the message and calls latcontrol_torque_ext.update_speed_dep_torque()
+    5. The lateral controller interpolates LAF and friction by speed each frame
+
+  Bin configuration:
+    - Cars with a speed_dependent.toml entry use per-car bin centers (and derived bounds)
+    - Cars without an entry use DEFAULT_SPEED_BIN_BOUNDS and seed all bins with global offline values
+    - Bin ranges are derived from centers via midpoint calculation (see _centers_to_bounds)
+  """
+
   def __init__(self, CP: car.CarParams):
     self.CP = CP
     self._params = Params()
