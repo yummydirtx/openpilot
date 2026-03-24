@@ -19,10 +19,10 @@ RELAXED_MIN_BUCKET_POINTS = np.array([1, 200, 300, 500, 500, 300, 200, 1])
 
 ALLOWED_CARS = ['toyota', 'hyundai', 'rivian', 'honda']
 
-# Speed-binned learning constants — bins aligned with common US driving speeds.
+# Default speed bins — used when car has no speed_dependent.toml entry.
 # Skip <5 m/s where lat_accel = v*yaw_rate is noisy.
-SPEED_BIN_BOUNDS = [(5, 8), (8, 12), (12, 18), (18, 24), (24, 29), (29, 35), (35, 40)]
-SPEED_BIN_CENTERS = [6.5, 10.0, 15.0, 21.0, 26.5, 32.0, 37.5]
+DEFAULT_SPEED_BIN_BOUNDS = [(5, 8), (8, 12), (12, 18), (18, 24), (24, 29), (29, 35), (35, 40)]
+DEFAULT_SPEED_BIN_CENTERS = [6.5, 10.0, 15.0, 21.0, 26.5, 32.0, 37.5]
 MIN_POINTS_PER_SPEED_BIN = 600
 FIT_POINTS_PER_SPEED_BIN = 400
 POINTS_PER_SPEED_BUCKET = 500
@@ -84,6 +84,17 @@ class TorqueEstimatorExt:
 
   # --- Speed-binned learning hooks (called from torqued.py) ---
 
+  @staticmethod
+  def _centers_to_bounds(centers):
+    """Derive bin bounds from centers using midpoints between consecutive centers.
+    First bin starts at default lower edge (5 m/s), last bin ends at default upper edge (40 m/s)."""
+    bounds = []
+    for i, c in enumerate(centers):
+      lo = DEFAULT_SPEED_BIN_BOUNDS[0][0] if i == 0 else (centers[i - 1] + c) / 2
+      hi = DEFAULT_SPEED_BIN_BOUNDS[-1][1] if i == len(centers) - 1 else (c + centers[i + 1]) / 2
+      bounds.append((lo, hi))
+    return bounds
+
   def _post_reset(self):
     """Called from TorqueEstimator.reset(). Initializes per-speed-bin buckets."""
     if not self.speed_binned:
@@ -92,23 +103,34 @@ class TorqueEstimatorExt:
     from openpilot.selfdrive.locationd.torqued import TorqueBuckets, STEER_BUCKET_BOUNDS, MIN_FILTER_DECAY
     from opendbc.sunnypilot.car.interfaces import _get_speed_dep_config
 
+    cfg = _get_speed_dep_config().get(self.CP.carFingerprint, {})
+
+    # Per-car bin ranges from config, or defaults
+    if 'speed_bp' in cfg:
+      self.speed_bin_centers = list(cfg['speed_bp'])
+      self.speed_bin_bounds = self._centers_to_bounds(self.speed_bin_centers)
+    else:
+      self.speed_bin_bounds = list(DEFAULT_SPEED_BIN_BOUNDS)
+      self.speed_bin_centers = list(DEFAULT_SPEED_BIN_CENTERS)
+
+    n_bins = len(self.speed_bin_bounds)
+
     self.speed_bin_points = [
       TorqueBuckets(x_bounds=STEER_BUCKET_BOUNDS,
                     min_points=self.min_bucket_points,
                     min_points_total=MIN_POINTS_PER_SPEED_BIN,
                     points_per_bucket=POINTS_PER_SPEED_BUCKET,
                     rowsize=3)
-      for _ in SPEED_BIN_BOUNDS
+      for _ in range(n_bins)
     ]
 
-    cfg = _get_speed_dep_config().get(self.CP.carFingerprint, {})
-    ref_lafs = cfg.get('laf_bp', [self.offline_latAccelFactor] * len(SPEED_BIN_BOUNDS))
-    ref_frictions = cfg.get('friction_bp', [self.offline_friction] * len(SPEED_BIN_BOUNDS))
-    self.speed_bin_decays = [MIN_FILTER_DECAY] * len(SPEED_BIN_BOUNDS)
+    ref_lafs = cfg.get('laf_bp', [self.offline_latAccelFactor] * n_bins)
+    ref_frictions = cfg.get('friction_bp', [self.offline_friction] * n_bins)
+    self.speed_bin_decays = [MIN_FILTER_DECAY] * n_bins
     self.speed_bin_filtered = [
       {'latAccelFactor': FirstOrderFilter(ref_lafs[i], self.speed_bin_decays[i], DT_MDL),
        'frictionCoefficient': FirstOrderFilter(ref_frictions[i], self.speed_bin_decays[i], DT_MDL)}
-      for i in range(len(SPEED_BIN_BOUNDS))
+      for i in range(n_bins)
     ]
     self.speed_bin_laf_bounds = [
       ((1.0 - self.factor_sanity) * laf, (1.0 + self.factor_sanity) * laf)
@@ -140,7 +162,7 @@ class TorqueEstimatorExt:
     if not self.speed_binned:
       return
     self._ensure_speed_bins()
-    for i, (lo, hi) in enumerate(SPEED_BIN_BOUNDS):
+    for i, (lo, hi) in enumerate(self.speed_bin_bounds):
       if lo <= vego < hi:
         self.speed_bin_points[i].add_point(steer, lateral_acc)
         break
@@ -149,15 +171,16 @@ class TorqueEstimatorExt:
     """Restores per-bin filter values and points from cache."""
     if not self.speed_binned:
       return
-    if (len(cache_ltp.speedBinLatAccelFactors) == len(SPEED_BIN_BOUNDS) and
-        len(cache_ltp.speedBinFrictions) == len(SPEED_BIN_BOUNDS)):
-      for i in range(len(SPEED_BIN_BOUNDS)):
+    n_bins = len(self.speed_bin_bounds)
+    if (len(cache_ltp.speedBinLatAccelFactors) == n_bins and
+        len(cache_ltp.speedBinFrictions) == n_bins):
+      for i in range(n_bins):
         self.speed_bin_filtered[i]['latAccelFactor'].x = cache_ltp.speedBinLatAccelFactors[i]
         self.speed_bin_filtered[i]['frictionCoefficient'].x = cache_ltp.speedBinFrictions[i]
-      if len(cache_ltp.speedBinPoints) == len(SPEED_BIN_BOUNDS):
-        for i in range(len(SPEED_BIN_BOUNDS)):
+      if len(cache_ltp.speedBinPoints) == n_bins:
+        for i in range(n_bins):
           self.speed_bin_points[i].load_points(cache_ltp.speedBinPoints[i])
-      self.speed_bin_decays = [self.decay] * len(SPEED_BIN_BOUNDS)
+      self.speed_bin_decays = [self.decay] * n_bins
       cloudlog.info("restored speed-bin torque params from cache")
 
   def _estimate_params_speed_binned(self):
@@ -195,10 +218,11 @@ class TorqueEstimatorExt:
     if not self.speed_binned or not hasattr(self, 'speed_bin_points'):
       return
     bin_results = self._estimate_params_speed_binned()
-    bin_cal_percs = [float(self.speed_bin_points[i].get_valid_percent()) for i in range(len(SPEED_BIN_BOUNDS))]
-    ltp.speedBinCenters = SPEED_BIN_CENTERS
-    ltp.speedBinLatAccelFactors = [float(self.speed_bin_filtered[i]['latAccelFactor'].x) for i in range(len(SPEED_BIN_BOUNDS))]
-    ltp.speedBinFrictions = [float(self.speed_bin_filtered[i]['frictionCoefficient'].x) for i in range(len(SPEED_BIN_BOUNDS))]
+    n_bins = len(self.speed_bin_bounds)
+    bin_cal_percs = [float(self.speed_bin_points[i].get_valid_percent()) for i in range(n_bins)]
+    ltp.speedBinCenters = self.speed_bin_centers
+    ltp.speedBinLatAccelFactors = [float(self.speed_bin_filtered[i]['latAccelFactor'].x) for i in range(n_bins)]
+    ltp.speedBinFrictions = [float(self.speed_bin_filtered[i]['frictionCoefficient'].x) for i in range(n_bins)]
     ltp.speedBinValid = [valid and bin_cal_percs[i] >= SPEED_BIN_MIN_CAL_PERC for i, (_, valid) in enumerate(bin_results)]
     ltp.speedBinCalPerc = bin_cal_percs
     if with_points:
