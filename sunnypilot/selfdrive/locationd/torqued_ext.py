@@ -21,8 +21,8 @@ ALLOWED_CARS = ['toyota', 'hyundai', 'rivian', 'honda']
 
 # Speed-binned learning constants — bins aligned with common US driving speeds.
 # Skip <5 m/s where lat_accel = v*yaw_rate is noisy.
-SPEED_BIN_BOUNDS = [(5, 12), (12, 18), (18, 24), (24, 29), (29, 35), (35, 40)]
-SPEED_BIN_CENTERS = [8.5, 15.0, 21.0, 26.5, 32.0, 37.5]
+SPEED_BIN_BOUNDS = [(5, 8), (8, 12), (12, 18), (18, 24), (24, 29), (29, 35), (35, 40)]
+SPEED_BIN_CENTERS = [6.5, 10.0, 15.0, 21.0, 26.5, 32.0, 37.5]
 MIN_POINTS_PER_SPEED_BIN = 600
 FIT_POINTS_PER_SPEED_BIN = 400
 POINTS_PER_SPEED_BUCKET = 500
