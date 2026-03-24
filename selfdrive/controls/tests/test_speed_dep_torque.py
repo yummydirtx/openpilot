@@ -79,13 +79,16 @@ class TestSpeedDepTorqueCallbacks:
   def test_update_speed_dep_laf_within_bounds(self):
     for fingerprint, cfg in SPEED_DEP_CARS.items():
       ci = make_ci(fingerprint)
-      original = list(ci._speed_dep_laf_v)
-      nudged_laf = [v * 1.05 for v in original]
-      friction = cfg.get('friction_bp', [0.1] * len(cfg['speed_bp']))
-      ci.update_speed_dep_laf(cfg['speed_bp'], nudged_laf, friction, [True] * len(cfg['speed_bp']))
-      for i in range(len(original)):
+      original_laf = list(ci._speed_dep_laf_v)
+      original_fric = list(ci._speed_dep_friction_v)
+      nudged_laf = [v * 1.05 for v in original_laf]
+      nudged_fric = [v * 1.05 for v in original_fric]
+      ci.update_speed_dep_laf(cfg['speed_bp'], nudged_laf, nudged_fric, [True] * len(cfg['speed_bp']))
+      for i in range(len(original_laf)):
         assert ci._speed_dep_laf_v[i] == pytest.approx(nudged_laf[i], abs=1e-4), \
-          f"{fingerprint} bin {i}: should accept +5% nudge"
+          f"{fingerprint} bin {i}: LAF should accept +5% nudge"
+        assert ci._speed_dep_friction_v[i] == pytest.approx(nudged_fric[i], abs=1e-4), \
+          f"{fingerprint} bin {i}: friction should accept +5% nudge"
 
   def test_update_speed_dep_laf_out_of_bounds_rejected(self):
     for fingerprint, cfg in SPEED_DEP_CARS.items():

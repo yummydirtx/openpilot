@@ -16,10 +16,16 @@ class LatControlTorqueExt(NeuralNetworkLateralControl, LatControlTorqueExtOverri
     NeuralNetworkLateralControl.__init__(self, lac_torque, CP, CP_SP, CI)
     LatControlTorqueExtOverride.__init__(self, CP)
     self._CI = CI
+    self._speed_dep_active = False
+    self._speed_dep_speed_bp = []
+    self._speed_dep_friction_bp = []
 
   def update(self, CS, VM, pid, params, ff, pid_log, setpoint, measurement, calibrated_pose, roll_compensation,
              desired_lateral_accel, actual_lateral_accel, lateral_accel_deadzone, gravity_adjusted_lateral_accel,
              desired_curvature, actual_curvature, steer_limited_by_safety, output_torque):
+    # Interpolate friction at current speed each frame
+    if self._speed_dep_active and len(self._speed_dep_speed_bp) > 0:
+      self.lac_torque.torque_params.friction = float(np.interp(CS.vEgo, self._speed_dep_speed_bp, self._speed_dep_friction_bp))
     self._ff = ff
     self._pid = pid
     self._pid_log = pid_log
@@ -50,7 +56,13 @@ class LatControlTorqueExt(NeuralNetworkLateralControl, LatControlTorqueExtOverri
     if hasattr(self._CI, 'update_speed_dep_laf'):
       self._CI.update_speed_dep_laf(speed_bp, laf_bp, friction_bp, valid_bp)
 
-    # Use representative LAF for PID limits (most common driving speed)
+    # Store tables for per-frame friction interpolation in update()
+    self._speed_dep_active = True
+    self._speed_dep_speed_bp = speed_bp
+    self._speed_dep_friction_bp = friction_bp
+
+    # Use representative values at 20 m/s for PID limits
     self.lac_torque.torque_params.latAccelFactor = float(np.interp(20.0, speed_bp, laf_bp))
     self.lac_torque.torque_params.latAccelOffset = torque_params.latAccelOffsetFiltered
+    self.lac_torque.torque_params.friction = float(np.interp(20.0, speed_bp, friction_bp))
     self.lac_torque.update_limits()
