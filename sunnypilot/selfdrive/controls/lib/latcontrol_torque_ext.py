@@ -47,7 +47,12 @@ class LatControlTorqueExt(NeuralNetworkLateralControl, LatControlTorqueExtOverri
     return self._pid_log, self._output_torque
 
   def update_speed_dep_torque(self, torque_params):
-    """Apply speed-dependent learned values from torqued to the CI and PID limits."""
+    """Apply speed-dependent learned values from torqued to the CI and PID limits.
+
+    The CI's update_speed_dep_laf already gates per-bin updates on valid_bp,
+    keeping seed values for invalid bins. We read back the CI's friction/LAF
+    tables (which blend seeds and learned values correctly) for interpolation.
+    """
     speed_bp = list(torque_params.speedBinCenters)
     laf_bp = list(torque_params.speedBinLatAccelFactors)
     friction_bp = list(torque_params.speedBinFrictions)
@@ -56,13 +61,17 @@ class LatControlTorqueExt(NeuralNetworkLateralControl, LatControlTorqueExtOverri
     if hasattr(self._CI, 'update_speed_dep_laf'):
       self._CI.update_speed_dep_laf(speed_bp, laf_bp, friction_bp, valid_bp)
 
-    # Store tables for per-frame friction interpolation in update()
-    self._speed_dep_active = True
-    self._speed_dep_speed_bp = speed_bp
-    self._speed_dep_friction_bp = friction_bp
+    # Read back the CI's gated values (seeds for invalid bins, learned for valid)
+    if hasattr(self._CI, '_speed_dep') and self._CI._speed_dep:
+      self._speed_dep_active = True
+      self._speed_dep_speed_bp = list(self._CI._speed_dep_speed_bp)
+      self._speed_dep_friction_bp = list(self._CI._speed_dep_friction_v)
+      gated_laf_bp = list(self._CI._speed_dep_laf_v)
+    else:
+      return
 
     # Use representative values at 20 m/s for PID limits
-    self.lac_torque.torque_params.latAccelFactor = float(np.interp(20.0, speed_bp, laf_bp))
+    self.lac_torque.torque_params.latAccelFactor = float(np.interp(20.0, self._speed_dep_speed_bp, gated_laf_bp))
     self.lac_torque.torque_params.latAccelOffset = torque_params.latAccelOffsetFiltered
-    self.lac_torque.torque_params.friction = float(np.interp(20.0, speed_bp, friction_bp))
+    self.lac_torque.torque_params.friction = float(np.interp(20.0, self._speed_dep_speed_bp, self._speed_dep_friction_bp))
     self.lac_torque.update_limits()
