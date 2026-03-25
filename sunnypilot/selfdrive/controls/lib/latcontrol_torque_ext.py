@@ -16,11 +16,6 @@ class LatControlTorqueExt(NeuralNetworkLateralControl, LatControlTorqueExtOverri
     NeuralNetworkLateralControl.__init__(self, lac_torque, CP, CP_SP, CI)
     LatControlTorqueExtOverride.__init__(self, CP)
     self._CI = CI
-    self._speed_dep_active = False
-    self._speed_dep_speed_bp = []
-    self._speed_dep_laf_bp = []
-    self._speed_dep_friction_bp = []
-    self._last_vego = 0.0  # stored for update_override_torque_params (runs before update)
 
   def update(self, CS, VM, pid, params, ff, pid_log, setpoint, measurement, calibrated_pose, roll_compensation,
              desired_lateral_accel, actual_lateral_accel, lateral_accel_deadzone, gravity_adjusted_lateral_accel,
