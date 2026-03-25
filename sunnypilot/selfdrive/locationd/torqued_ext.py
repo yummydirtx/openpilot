@@ -166,9 +166,8 @@ class TorqueEstimatorExt:
       for i in range(n_bins)
     ]
     # Fixed ±30% sanity bounds for speed bins — independent of the "Less Restrict"
-    # toggle. Matches the CI's update_speed_dep_laf bounds. Without this, default
-    # factor_sanity=0.0 would clamp learned values to exactly the seed values,
-    # silently preventing any learning.
+    # toggle. Without this, default factor_sanity=0.0 would clamp learned values
+    # to exactly the seed values, silently preventing any learning.
     SPEED_BIN_SANITY = 0.3
     self.speed_bin_laf_bounds = [
       ((1.0 - SPEED_BIN_SANITY) * laf, (1.0 + SPEED_BIN_SANITY) * laf)
