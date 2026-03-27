@@ -43,7 +43,8 @@ class LatControlTorqueExt(NeuralNetworkLateralControl, LatControlTorqueExtOverri
 
   def update_speed_dep_torque(self, tp):
     """Apply speed-dependent learned values from torqued.
-    Uses learned values for valid bins, global filtered as fallback."""
+    Uses learned values for valid bins. For invalid bins, falls back to
+    TOML seed values if available for this car, otherwise global filtered."""
     speed_bp = list(tp.speedBinCenters)
     if not speed_bp:
       self._speed_dep_active = False
@@ -52,13 +53,26 @@ class LatControlTorqueExt(NeuralNetworkLateralControl, LatControlTorqueExtOverri
     factors = list(tp.speedBinLatAccelFactors)
     frictions = list(tp.speedBinFrictions)
     valid_bp = list(tp.speedBinValid)
-    global_factor = tp.latAccelFactorFiltered
-    global_fric = tp.frictionCoefficientFiltered
+
+    # Prefer TOML seeds as fallback for invalid bins; use global filtered only
+    # when no per-car config exists.
+    from opendbc.sunnypilot.car.interfaces import get_speed_dep_config
+    cfg = get_speed_dep_config().get(self.CP.carFingerprint, {})
+    seed_lafs = cfg.get('laf_bp')
+    seed_frictions = cfg.get('friction_bp')
+    if seed_lafs and len(seed_lafs) == len(speed_bp):
+      fallback_factors = seed_lafs
+      fallback_frictions = seed_frictions
+    else:
+      global_factor = tp.latAccelFactorFiltered
+      global_fric = tp.frictionCoefficientFiltered
+      fallback_factors = [global_factor] * len(speed_bp)
+      fallback_frictions = [global_fric] * len(speed_bp)
 
     self._speed_dep_active = True
     self._speed_dep_speed_bp = speed_bp
-    self._speed_dep_lat_accel_factor_bp = [factors[i] if valid_bp[i] else global_factor for i in range(len(speed_bp))]
-    self._speed_dep_friction_bp = [frictions[i] if valid_bp[i] else global_fric for i in range(len(speed_bp))]
+    self._speed_dep_lat_accel_factor_bp = [factors[i] if valid_bp[i] else fallback_factors[i] for i in range(len(speed_bp))]
+    self._speed_dep_friction_bp = [frictions[i] if valid_bp[i] else fallback_frictions[i] for i in range(len(speed_bp))]
 
     # Set representative values at 20 m/s for PID limits (actual per-frame
     # interpolation happens in update_override_torque_params before each frame)
