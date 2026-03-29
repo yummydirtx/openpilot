@@ -9,21 +9,22 @@ See the LICENSE.md file in the root directory for more details.
 from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl
 from openpilot.selfdrive.ui.sunnypilot.mici.widgets.button import BigMultiParamToggleSP
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets.scroller import NavScroller
 
 
 TOGGLE_PARAMS = [
-  ("blind spot", "BlindSpot"),
-  ("steering arc", "TorqueBar"),
-  ("rainbow mode", "RainbowMode"),
-  ("standstill timer", "StandstillTimer"),
-  ("road name", "RoadNameToggle"),
-  ("green light alert", "GreenLightAlert"),
-  ("lead depart alert", "LeadDepartAlert"),
-  ("true speed", "TrueVEgoUI"),
-  ("hide speed", "HideVEgoUI"),
-  ("turn signals", "ShowTurnSignals"),
-  ("accel bar", "RocketFuel"),
+  (tr("blind spot"), "BlindSpot"),
+  (tr("steering arc"), "TorqueBar"),
+  (tr("rainbow mode"), "RainbowMode"),
+  (tr("standstill timer"), "StandstillTimer"),
+  (tr("road name"), "RoadNameToggle"),
+  (tr("green light alert"), "GreenLightAlert"),
+  (tr("lead depart alert"), "LeadDepartAlert"),
+  (tr("true speed"), "TrueVEgoUI"),
+  (tr("hide speed"), "HideVEgoUI"),
+  (tr("turn signals"), "ShowTurnSignals"),
+  (tr("accel bar"), "RocketFuel"),
 ]
 
 
@@ -40,12 +41,12 @@ class VisualsLayoutMici(NavScroller):
       items.append(toggle)
 
     self._chevron_info = BigMultiParamToggleSP(
-      "chevron info", "ChevronInfo",
-      ["off", "dist", "speed", "time", "all"],
+      tr("chevron info"), "ChevronInfo",
+      [tr("off"), tr("dist"), tr("speed"), tr("time"), tr("all")],
     )
     self._dev_ui_info = BigMultiParamToggleSP(
-      "dev UI", "DevUIInfo",
-      ["off", "bottom", "right", "R&B"],
+      tr("dev UI"), "DevUIInfo",
+      [tr("off"), tr("bottom"), tr("right"), tr("R&B")],
     )
     items.append(self._chevron_info)
     items.append(self._dev_ui_info)

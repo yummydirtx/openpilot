@@ -9,40 +9,41 @@ See the LICENSE.md file in the root directory for more details.
 from openpilot.selfdrive.ui.sunnypilot.mici.widgets.button import BigParamOption
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.display import ONROAD_BRIGHTNESS_TIMER_VALUES, OnroadBrightness
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets.scroller import NavScroller
 
 
 def _timer_picker_unit():
   raw = ui_state.params.get("OnroadScreenOffTimer", return_default=True) or 0
   mapped = ONROAD_BRIGHTNESS_TIMER_VALUES.get(raw, raw)
-  return "seconds" if mapped < 60 else "minutes"
+  return tr("seconds") if mapped < 60 else tr("minutes")
 
 
 def _brightness_label(val):
   if val == OnroadBrightness.AUTO:
-    return "auto"
+    return tr("auto")
   if val == OnroadBrightness.AUTO_DARK:
-    return "auto (dark)"
+    return tr("auto (dark)")
   if val == OnroadBrightness.SCREEN_OFF:
-    return "screen off"
+    return tr("screen off")
   return f"{(val - 2) * 5}%"
 
 
 def _brightness_picker_label(val):
   if val == OnroadBrightness.AUTO:
-    return "auto"
+    return tr("auto")
   if val == OnroadBrightness.AUTO_DARK:
-    return "auto\n(dark)"
+    return tr("auto") + "\n" + tr("(dark)")
   if val == OnroadBrightness.SCREEN_OFF:
-    return "0\n(off)"
+    return "0\n" + tr("(off)")
   return str((val - 2) * 5)
 
 
 def _timer_label(val):
   if val < 60:
-    return f"{val} second{'s' if val != 1 else ''}"
+    return f"{val} " + (tr("seconds") if val != 1 else tr("second"))
   mins = int(val / 60)
-  return f"{mins} minute{'s' if mins != 1 else ''}"
+  return f"{mins} " + (tr("minutes") if mins != 1 else tr("minute"))
 
 
 def _timer_picker_label(val):
@@ -53,8 +54,8 @@ def _timer_picker_label(val):
 
 def _timeout_label(val):
   if not val:
-    return "default"
-  return f"{val} seconds"
+    return tr("default")
+  return f"{val} " + tr("seconds")
 
 
 class DisplayLayoutMici(NavScroller):
@@ -62,7 +63,7 @@ class DisplayLayoutMici(NavScroller):
     super().__init__()
 
     self._brightness = BigParamOption(
-      "brightness", "OnroadScreenOffBrightness",
+      tr("brightness"), "OnroadScreenOffBrightness",
       min_value=0, max_value=22,
       label_callback=_brightness_label,
       picker_label_callback=_brightness_picker_label,
@@ -70,7 +71,7 @@ class DisplayLayoutMici(NavScroller):
       picker_item_width=140,
     )
     self._brightness_timer = BigParamOption(
-      "brightness delay", "OnroadScreenOffTimer",
+      tr("brightness delay"), "OnroadScreenOffTimer",
       min_value=0, max_value=11,
       value_map=ONROAD_BRIGHTNESS_TIMER_VALUES,
       label_callback=_timer_label,
@@ -78,11 +79,11 @@ class DisplayLayoutMici(NavScroller):
       picker_unit=_timer_picker_unit,
     )
     self._ui_timeout = BigParamOption(
-      "ui timeout", "InteractivityTimeout",
+      tr("ui timeout"), "InteractivityTimeout",
       min_value=0, max_value=120, value_change_step=10,
       label_callback=_timeout_label,
-      picker_label_callback=lambda v: "default" if not v else str(v),
-      picker_unit="seconds",
+      picker_label_callback=lambda v: tr("default") if not v else str(v),
+      picker_unit=tr("seconds"),
     )
 
     self._scroller.add_widgets([self._brightness, self._brightness_timer, self._ui_timeout])

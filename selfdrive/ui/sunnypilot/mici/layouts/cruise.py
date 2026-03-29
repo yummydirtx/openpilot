@@ -12,12 +12,16 @@ from openpilot.selfdrive.ui.sunnypilot.mici.widgets.button import (
   BigParamOption,
   speed_unit,
 )
+from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 
-SL_MODE_LABELS = ["off", "info", "warn", "assist"]
-SL_SOURCE_LABELS = ["car", "map", "car-first", "map-first", "combined"]
+SL_MODE_LABELS = [tr("off"), tr("info"), tr("warn"), tr("assist")]
+SL_SOURCE_LABELS = [tr("car"), tr("map"), tr("car-first"), tr("map-first"), tr("combined")]
+SL_MODE_OFF = 0
+SL_MODE_WARN = 2
+SL_MODE_ASSIST = 3
 ACC_LONG_PRESS_MAP = {1: 1, 2: 5, 3: 10}
 
 
@@ -32,7 +36,7 @@ def _offset_unit():
 
 def _offset_label(value):
   unit = _offset_unit()
-  return f"{value}{unit}" if unit else "none"
+  return f"{value}{unit}" if unit else tr("none")
 
 
 class CruiseLayoutMici(NavScroller):
@@ -53,12 +57,12 @@ class CruiseLayoutMici(NavScroller):
     self._prev_sla_available: bool | None = None
 
     # --- Main view items ---
-    self._icbm_toggle = BigParamControl("intelligent cruise button management", "IntelligentCruiseButtonManagement")
-    self._dec_toggle = BigParamControl("dynamic experimental control", "DynamicExperimentalControl")
-    self._scc_v_toggle = BigParamControl("smart cruise vision", "SmartCruiseControlVision")
-    self._scc_m_toggle = BigParamControl("smart cruise map", "SmartCruiseControlMap")
-    self._custom_acc_btn = BigButtonSP("custom increments")
-    self._speed_limit_btn = BigButtonSP("speed limit")
+    self._icbm_toggle = BigParamControl(tr("intelligent cruise button management"), "IntelligentCruiseButtonManagement")
+    self._dec_toggle = BigParamControl(tr("dynamic experimental control"), "DynamicExperimentalControl")
+    self._scc_v_toggle = BigParamControl(tr("smart cruise vision"), "SmartCruiseControlVision")
+    self._scc_m_toggle = BigParamControl(tr("smart cruise map"), "SmartCruiseControlMap")
+    self._custom_acc_btn = BigButtonSP(tr("custom increments"))
+    self._speed_limit_btn = BigButtonSP(tr("speed limit"))
 
     for btn in [self._custom_acc_btn, self._speed_limit_btn]:
       btn.set_subtitle_font_size(24)
@@ -70,22 +74,22 @@ class CruiseLayoutMici(NavScroller):
     ])
 
     # --- Custom ACC sub-panel ---
-    self._custom_acc_toggle = BigParamControl("enable custom increments", "CustomAccIncrementsEnabled")
+    self._custom_acc_toggle = BigParamControl(tr("enable custom increments"), "CustomAccIncrementsEnabled")
 
     def _speed_label(v):
       return f"{v} {speed_unit()}"
-    self._acc_short = BigParamOption("short press", "CustomAccShortPressIncrement",
+    self._acc_short = BigParamOption(tr("short press"), "CustomAccShortPressIncrement",
                                      min_value=1, max_value=10, label_callback=_speed_label, picker_unit=speed_unit)
-    self._acc_long = BigParamOption("long press", "CustomAccLongPressIncrement",
+    self._acc_long = BigParamOption(tr("long press"), "CustomAccLongPressIncrement",
                                     min_value=1, max_value=3, value_map=ACC_LONG_PRESS_MAP,
                                     label_callback=_speed_label, picker_unit=speed_unit)
     self._acc_view = self._custom_acc_btn.link_sub_panel([self._custom_acc_toggle, self._acc_short, self._acc_long])
 
     # --- Speed limit sub-panel ---
-    self._sl_mode = BigMultiParamToggleSP("speed limit mode", "SpeedLimitMode", SL_MODE_LABELS)
-    self._sl_source = BigMultiParamToggleSP("source", "SpeedLimitPolicy", SL_SOURCE_LABELS)
-    self._sl_offset_type = BigMultiParamToggleSP("offset type", "SpeedLimitOffsetType", ["none", "fixed", "%"])
-    self._sl_offset_value = BigParamOption("offset value", "SpeedLimitValueOffset",
+    self._sl_mode = BigMultiParamToggleSP(tr("speed limit mode"), "SpeedLimitMode", SL_MODE_LABELS)
+    self._sl_source = BigMultiParamToggleSP(tr("source"), "SpeedLimitPolicy", SL_SOURCE_LABELS)
+    self._sl_offset_type = BigMultiParamToggleSP(tr("offset type"), "SpeedLimitOffsetType", [tr("none"), tr("fixed"), "%"])
+    self._sl_offset_value = BigParamOption(tr("offset value"), "SpeedLimitValueOffset",
                                            min_value=-30, max_value=30, label_callback=_offset_label, picker_unit=_offset_unit)
     self._sl_view = self._speed_limit_btn.link_sub_panel([self._sl_mode, self._sl_source, self._sl_offset_type, self._sl_offset_value])
 
@@ -139,7 +143,7 @@ class CruiseLayoutMici(NavScroller):
     sl_mode_idx = ui_state.params.get("SpeedLimitMode", return_default=True) or 0
     sl_mode = SL_MODE_LABELS[min(sl_mode_idx, len(SL_MODE_LABELS) - 1)]
     offset_type = ui_state.params.get("SpeedLimitOffsetType", return_default=True)
-    if sl_mode == "off":
+    if sl_mode_idx == SL_MODE_OFF:
       self._speed_limit_btn.set_disabled()
     else:
       sl_source_idx = ui_state.params.get("SpeedLimitPolicy", return_default=True) or 0
@@ -181,8 +185,8 @@ class CruiseLayoutMici(NavScroller):
     # Downgrade "assist" to "warning" when unavailable — only on transition
     if not sla_available and self._prev_sla_available is not False:
       sl_mode_idx = ui_state.params.get("SpeedLimitMode", return_default=True) or 0
-      if sl_mode_idx == SL_MODE_LABELS.index("assist"):
-        ui_state.params.put("SpeedLimitMode", SL_MODE_LABELS.index("warn"))
+      if sl_mode_idx == SL_MODE_ASSIST:
+        ui_state.params.put("SpeedLimitMode", SL_MODE_WARN)
     self._prev_sla_available = sla_available
 
     if not gui_app.widget_in_stack(self._sl_view):

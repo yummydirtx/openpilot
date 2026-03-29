@@ -17,6 +17,7 @@ from openpilot.selfdrive.ui.lib.api_helpers import get_token
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.ui_state import ui_state, device
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
+from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets.scroller import NavScroller
 
 UPDATE_INTERVAL = 30
@@ -33,8 +34,8 @@ class TripsLayoutMici(NavScroller):
     self._stats = self._get_stats()
 
     STAT_LABELS = [
-      "all time drives", "all time distance", "all time hours",
-      "week drives", "week distance", "week hours",
+      tr("all time drives"), tr("all time distance"), tr("all time hours"),
+      tr("week drives"), tr("week distance"), tr("week hours"),
     ]
     self._stat_buttons = []
     for label in STAT_LABELS:
@@ -97,7 +98,7 @@ class TripsLayoutMici(NavScroller):
       return [
         str(int(data.get("routes", 0))),
         f"{fmt_dist(data)} {dist_unit}",
-        f"{int(data.get('minutes', 0) / 60)} hrs",
+        f"{int(data.get('minutes', 0) / 60)} " + tr("hrs"),
       ]
 
     values = fmt_period(all_time) + fmt_period(week)
