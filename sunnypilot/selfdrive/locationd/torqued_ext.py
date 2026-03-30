@@ -20,9 +20,6 @@ RELAXED_MIN_BUCKET_POINTS = np.array([1, 200, 300, 500, 500, 300, 200, 1])
 # Default speed bins — used when car has no speed_dependent.toml entry.
 DEFAULT_SPEED_BIN_BOUNDS = [(5, 8), (8, 12), (12, 18), (18, 24), (24, 29), (29, 35), (35, 40)]
 DEFAULT_SPEED_BIN_CENTERS = [6.5, 10.0, 15.0, 21.0, 26.5, 32.0, 37.5]
-MIN_POINTS_PER_SPEED_BIN = 600
-FIT_POINTS_PER_SPEED_BIN = 400
-POINTS_PER_SPEED_BUCKET = 500
 
 
 class TorqueEstimatorExt:
@@ -120,7 +117,8 @@ class TorqueEstimatorExt:
     if not self.speed_binned:
       return
 
-    from openpilot.selfdrive.locationd.torqued import TorqueBuckets, STEER_BUCKET_BOUNDS, MIN_FILTER_DECAY
+    from openpilot.selfdrive.locationd.torqued import TorqueBuckets, STEER_BUCKET_BOUNDS, \
+      POINTS_PER_BUCKET, MIN_FILTER_DECAY
     from opendbc.sunnypilot.car.interfaces import get_speed_dep_config
 
     cfg = get_speed_dep_config().get(self.CP.carFingerprint, {})
@@ -134,7 +132,7 @@ class TorqueEstimatorExt:
 
     n_bins = len(self.speed_bin_bounds)
 
-    self.speed_bin_points = [self._make_speed_bin_bucket(TorqueBuckets, STEER_BUCKET_BOUNDS) for _ in range(n_bins)]
+    self.speed_bin_points = [self._make_speed_bin_bucket(TorqueBuckets, STEER_BUCKET_BOUNDS, POINTS_PER_BUCKET) for _ in range(n_bins)]
     self._speed_bin_last_len = [0] * n_bins
     self._speed_bin_last_valid = [False] * n_bins
 
@@ -159,12 +157,15 @@ class TorqueEstimatorExt:
       for f in ref_frictions
     ]
 
-  def _make_speed_bin_bucket(self, TorqueBuckets, STEER_BUCKET_BOUNDS):
-    """Create a single speed-bin TorqueBuckets instance."""
+  def _make_speed_bin_bucket(self, TorqueBuckets, STEER_BUCKET_BOUNDS, POINTS_PER_BUCKET):
+    """Create a single speed-bin TorqueBuckets instance.
+    Per-bucket minimums are scaled down from the global learner since each
+    speed bin sees a fraction of the total data."""
+    scaled_min = np.maximum(self.min_bucket_points // len(self.speed_bin_bounds), 1)
     return TorqueBuckets(x_bounds=STEER_BUCKET_BOUNDS,
-                         min_points=self.min_bucket_points,
-                         min_points_total=MIN_POINTS_PER_SPEED_BIN,
-                         points_per_bucket=POINTS_PER_SPEED_BUCKET,
+                         min_points=scaled_min,
+                         min_points_total=int(scaled_min.sum()),
+                         points_per_bucket=POINTS_PER_BUCKET,
                          rowsize=3)
 
   def _ensure_speed_bins(self):
@@ -213,7 +214,7 @@ class TorqueEstimatorExt:
   def _estimate_params_speed_binned(self):
     """Run independent SVD fit per speed bin. Resets bin on NaN with valid data."""
     from openpilot.selfdrive.locationd.torqued import TorqueBuckets, STEER_BUCKET_BOUNDS, \
-      FRICTION_FACTOR, slope2rot, MIN_FILTER_DECAY, MAX_FILTER_DECAY
+      POINTS_PER_BUCKET, FRICTION_FACTOR, FIT_POINTS_TOTAL, slope2rot, MIN_FILTER_DECAY, MAX_FILTER_DECAY
 
     results = []
     for i, bucket in enumerate(self.speed_bin_points):
@@ -227,7 +228,7 @@ class TorqueEstimatorExt:
         results.append((i, self._speed_bin_last_valid[i]))
         continue
 
-      points = bucket.get_points(FIT_POINTS_PER_SPEED_BIN)
+      points = bucket.get_points(FIT_POINTS_TOTAL)
       try:
         _, _, v = np.linalg.svd(points, full_matrices=False)
         slope, offset = -v.T[0:2, 2] / v.T[2, 2]
@@ -250,7 +251,7 @@ class TorqueEstimatorExt:
 
       if bucket.is_valid():
         cloudlog.warning(f"speed-dep: bin {i} produced NaN with valid data, resetting bin")
-        self.speed_bin_points[i] = self._make_speed_bin_bucket(TorqueBuckets, STEER_BUCKET_BOUNDS)
+        self.speed_bin_points[i] = self._make_speed_bin_bucket(TorqueBuckets, STEER_BUCKET_BOUNDS, POINTS_PER_BUCKET)
         self.speed_bin_decays[i] = MIN_FILTER_DECAY
         self._speed_bin_last_len[i] = 0
       self._speed_bin_last_valid[i] = False
@@ -273,7 +274,7 @@ class TorqueEstimatorExt:
       _, valid = bin_results[i]
       valid_flags.append(valid)
       if with_points:
-        bin_points.append(self.speed_bin_points[i].get_points(FIT_POINTS_PER_SPEED_BIN)[:, [0, 2]].tolist())
+        bin_points.append(self.speed_bin_points[i].get_points()[:, [0, 2]].tolist())
 
     ltp.speedBinCenters = self.speed_bin_centers
     ltp.speedBinLatAccelFactors = lat_factors
