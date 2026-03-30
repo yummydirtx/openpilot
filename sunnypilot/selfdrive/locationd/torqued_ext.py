@@ -144,16 +144,12 @@ class TorqueEstimatorExt:
        'frictionCoefficient': FirstOrderFilter(ref_frictions[i], self.speed_bin_decays[i], DT_MDL)}
       for i in range(n_bins)
     ]
-    # Fixed ±30% sanity bounds for speed bins — independent of the "Less Restrict"
-    # toggle. Without this, default factor_sanity=0.0 would clamp learned values
-    # to exactly the seed values, silently preventing any learning.
-    SPEED_BIN_SANITY = 0.3
     self.speed_bin_lat_accel_factor_bounds = [
-      ((1.0 - SPEED_BIN_SANITY) * factor, (1.0 + SPEED_BIN_SANITY) * factor)
+      ((1.0 - self.factor_sanity) * factor, (1.0 + self.factor_sanity) * factor)
       for factor in ref_lafs
     ]
     self.speed_bin_friction_bounds = [
-      ((1.0 - SPEED_BIN_SANITY) * f, (1.0 + SPEED_BIN_SANITY) * f)
+      ((1.0 - self.friction_sanity) * f, (1.0 + self.friction_sanity) * f)
       for f in ref_frictions
     ]
 
