@@ -168,27 +168,10 @@ class TorqueEstimatorExt:
                          points_per_bucket=POINTS_PER_BUCKET,
                          rowsize=3)
 
-  def _ensure_speed_bins(self):
-    """Init speed bins on first call only (also handles toggle-on after init).
-    Speed bins are independent of the global learner — a global NaN reset does
-    not affect them. Each bin resets independently if its own SVD produces NaN."""
-    if hasattr(self, 'speed_bin_points'):
-      return
-    self._post_reset()
-    try:
-      from cereal import log
-      cache = self._params.get("LiveTorqueParameters")
-      if cache:
-        with log.Event.from_bytes(cache) as evt:
-          self._restore_ext_cache(evt.liveTorqueParameters)
-    except Exception:
-      cloudlog.exception("speed-dep: failed to restore cache on first init")
-
   def _on_torque_point(self, steer, lateral_acc, vego):
     """Called from handle_log. Routes quality-filtered points to speed bins."""
     if not self.speed_binned:
       return
-    self._ensure_speed_bins()
     for i, (lo, hi) in enumerate(self.speed_bin_bounds):
       if lo <= vego < hi:
         self.speed_bin_points[i].add_point(steer, lateral_acc)
@@ -261,7 +244,7 @@ class TorqueEstimatorExt:
   def _extend_msg(self, ltp, with_points):
     """Called from get_msg. Skips if bins aren't initialized yet to prevent
     overwriting a good Params cache with empty arrays."""
-    if not self.speed_binned or not hasattr(self, 'speed_bin_points'):
+    if not self.speed_binned:
       return
     bin_results = self._estimate_params_speed_binned()
     n_bins = len(self.speed_bin_bounds)
