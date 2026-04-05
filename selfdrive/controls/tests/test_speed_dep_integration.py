@@ -496,3 +496,98 @@ class TestExtrapolationAtBoundaries:
       ovr.update_override_torque_params(tp)
       assert tp.latAccelFactor == pytest.approx(SAMPLE_LAT_ACCEL_FACTOR_BP[i], abs=1e-4)
       assert tp.friction == pytest.approx(SAMPLE_FRICTION_BP[i], abs=1e-4)
+
+
+class TestSteerMaxAwareLafInterpolation:
+  """LAF interpolation must account for speed-dependent STEER_MAX.
+  When STEER_MAX varies with speed, adjacent bins are on different
+  normalized torque scales. Interpolation normalizes to physical
+  space (LAF/STEER_MAX), interpolates, then denormalizes."""
+
+  STEER_MAX_LOOKUP = ([0., 14.4, 16.0], [1500, 1500, 750])
+  SPEED_BP = [14.4, 16.0]
+  LAF_BP = [2.96, 1.15]
+  FRICTION_BP = [0.129, 0.134]
+
+  def _make_with_steer_max(self):
+    ovr = make_override()
+    ovr._steer_max_lookup = self.STEER_MAX_LOOKUP
+    return ovr
+
+  def test_at_bin_centers_matches_raw_values(self):
+    """Normalization cancels out at exact bin centers."""
+    ovr = self._make_with_steer_max()
+    activate_speed_dep(ovr, speed_bp=self.SPEED_BP, lat_accel_factor_bp=self.LAF_BP,
+                       friction_bp=self.FRICTION_BP)
+    for i, speed in enumerate(self.SPEED_BP):
+      tp = TorqueParams()
+      ovr._last_vego = speed
+      ovr.update_override_torque_params(tp)
+      assert tp.latAccelFactor == pytest.approx(self.LAF_BP[i], abs=1e-4)
+
+  def test_midpoint_differs_from_naive_interp(self):
+    """STEER_MAX-aware interp must differ from plain np.interp in the transition."""
+    ovr = self._make_with_steer_max()
+    activate_speed_dep(ovr, speed_bp=self.SPEED_BP, lat_accel_factor_bp=self.LAF_BP,
+                       friction_bp=self.FRICTION_BP)
+    v_mid = 15.2
+    ovr._last_vego = v_mid
+    tp = TorqueParams()
+    ovr.update_override_torque_params(tp)
+
+    naive_laf = float(np.interp(v_mid, self.SPEED_BP, self.LAF_BP))
+    assert tp.latAccelFactor != pytest.approx(naive_laf, abs=0.01)
+
+  def test_physical_space_continuity(self):
+    """LAF/STEER_MAX (physical torque gain) should vary smoothly across transition."""
+    ovr = self._make_with_steer_max()
+    activate_speed_dep(ovr, speed_bp=self.SPEED_BP, lat_accel_factor_bp=self.LAF_BP,
+                       friction_bp=self.FRICTION_BP)
+    sm_speeds, sm_values = self.STEER_MAX_LOOKUP
+    physical = []
+    for v in np.linspace(14.4, 16.0, 20):
+      tp = TorqueParams()
+      ovr._last_vego = v
+      ovr.update_override_torque_params(tp)
+      sm = float(np.interp(v, sm_speeds, sm_values))
+      physical.append(tp.latAccelFactor / sm)
+    diffs = np.diff(physical)
+    # Physical-space LAF should be monotonic (no jumps)
+    assert all(d <= 1e-4 for d in diffs) or all(d >= -1e-4 for d in diffs)
+
+  def test_friction_unaffected(self):
+    """Friction uses plain interp regardless of STEER_MAX_LOOKUP."""
+    ovr = self._make_with_steer_max()
+    activate_speed_dep(ovr, speed_bp=self.SPEED_BP, lat_accel_factor_bp=self.LAF_BP,
+                       friction_bp=self.FRICTION_BP)
+    v_mid = 15.2
+    ovr._last_vego = v_mid
+    tp = TorqueParams()
+    ovr.update_override_torque_params(tp)
+    expected = float(np.interp(v_mid, self.SPEED_BP, self.FRICTION_BP))
+    assert tp.friction == pytest.approx(expected, abs=1e-4)
+
+  def test_no_lookup_uses_plain_interp(self):
+    """Cars without STEER_MAX_LOOKUP get plain np.interp (no regression)."""
+    ovr = make_override()  # _steer_max_lookup = None
+    activate_speed_dep(ovr, speed_bp=self.SPEED_BP, lat_accel_factor_bp=self.LAF_BP,
+                       friction_bp=self.FRICTION_BP)
+    v_mid = 15.2
+    ovr._last_vego = v_mid
+    tp = TorqueParams()
+    ovr.update_override_torque_params(tp)
+    expected = float(np.interp(v_mid, self.SPEED_BP, self.LAF_BP))
+    assert tp.latAccelFactor == pytest.approx(expected, abs=1e-4)
+
+  def test_constant_steer_max_equals_plain_interp(self):
+    """When STEER_MAX is constant, normalization has no effect."""
+    ovr = make_override()
+    ovr._steer_max_lookup = ([0., 40.], [800, 800])  # constant
+    activate_speed_dep(ovr, speed_bp=self.SPEED_BP, lat_accel_factor_bp=self.LAF_BP,
+                       friction_bp=self.FRICTION_BP)
+    v_mid = 15.2
+    ovr._last_vego = v_mid
+    tp = TorqueParams()
+    ovr.update_override_torque_params(tp)
+    expected = float(np.interp(v_mid, self.SPEED_BP, self.LAF_BP))
+    assert tp.latAccelFactor == pytest.approx(expected, abs=1e-4)
