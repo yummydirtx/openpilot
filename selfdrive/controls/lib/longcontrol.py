@@ -12,8 +12,10 @@ LongCtrlState = car.CarControl.Actuators.LongControlState
 
 def long_control_state_trans(CP, CP_SP, active, long_control_state, v_ego,
                              should_stop, brake_pressed, cruise_standstill):
-  # Gas Interceptor
-  cruise_standstill = cruise_standstill and not CP_SP.enableGasInterceptor
+  # Gas interceptor and Mazda's synthetic HOLD both still need to produce a real
+  # starting request even while the stock standstill bit remains asserted.
+  ignore_cruise_standstill = CP_SP.enableGasInterceptor or (CP.openpilotLongitudinalControl and CP.brand == "mazda")
+  cruise_standstill = cruise_standstill and not ignore_cruise_standstill
 
   stopping_condition = should_stop
   starting_condition = (not should_stop and
