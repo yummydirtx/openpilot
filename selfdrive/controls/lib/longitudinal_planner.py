@@ -11,7 +11,7 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.selfdrive.controls.lib.longcontrol import LongCtrlState
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import LongitudinalMpc, LongitudinalPlanSource
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import T_IDXS as T_IDXS_MPC
-from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N, get_accel_from_plan, get_target_speeds_from_plan, should_stop_with_hysteresis
+from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N, get_accel_from_plan
 from openpilot.selfdrive.car.cruise import V_CRUISE_MAX, V_CRUISE_UNSET
 from openpilot.common.swaglog import cloudlog
 
@@ -22,9 +22,6 @@ A_CRUISE_MAX_BP = [0., 10.0, 25., 40.]
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 ALLOW_THROTTLE_THRESHOLD = 0.4
 MIN_ALLOW_THROTTLE_SPEED = 2.5
-MAZDA_SHOULD_STOP_ENTER_MARGIN = 0.05
-MAZDA_SHOULD_STOP_EXIT_MARGIN = 0.05
-
 # Lookup table for turns
 _A_TOTAL_MAX_V = [1.7, 3.2]
 _A_TOTAL_MAX_BP = [20., 40.]
@@ -159,35 +156,17 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     action_t =  self.CP.longitudinalActuatorDelay + DT_MDL
     output_a_target_mpc, output_should_stop_mpc = get_accel_from_plan(self.v_desired_trajectory, self.a_desired_trajectory, CONTROL_N_T_IDX,
                                                                         action_t=action_t, vEgoStopping=self.CP.vEgoStopping)
-    v_target, v_target_1sec = get_target_speeds_from_plan(self.v_desired_trajectory, CONTROL_N_T_IDX, action_t)
     output_a_target_e2e = sm['modelV2'].action.desiredAcceleration
     output_should_stop_e2e = sm['modelV2'].action.shouldStop
 
     if self.is_e2e(sm):
       output_a_target = min(output_a_target_e2e, output_a_target_mpc)
-      output_should_stop = output_should_stop_e2e or output_should_stop_mpc
+      self.output_should_stop = output_should_stop_e2e or output_should_stop_mpc
       if output_a_target < output_a_target_mpc:
         self.mpc.source = LongitudinalPlanSource.e2e
     else:
       output_a_target = output_a_target_mpc
-      output_should_stop = output_should_stop_mpc
-
-    if self.CP.openpilotLongitudinalControl and self.CP.brand == "mazda":
-      # Mazda's synthetic HOLD path can get a one-cycle stop/go wobble when the
-      # future-speed target hovers right on the stopping threshold. Apply a
-      # small hysteresis so that low-speed restart doesn't bounce between
-      # starting and stopping.
-      output_should_stop = should_stop_with_hysteresis(v_target, v_target_1sec, self.CP.vEgoStopping,
-                                                       prev_should_stop=self.output_should_stop,
-                                                       enter_margin=MAZDA_SHOULD_STOP_ENTER_MARGIN,
-                                                       exit_margin=MAZDA_SHOULD_STOP_EXIT_MARGIN)
-      # e2e's boolean stop bit can chatter at standstill even while the model
-      # still asks for positive acceleration. Only let it override the future-
-      # speed hysteresis when it agrees with a non-positive accel request.
-      if self.is_e2e(sm) and output_should_stop_e2e and output_a_target <= 0.0:
-        output_should_stop = True
-
-    self.output_should_stop = output_should_stop
+      self.output_should_stop = output_should_stop_mpc
 
     for idx in range(2):
       accel_clip[idx] = np.clip(accel_clip[idx], self.prev_accel_clip[idx] - 0.05, self.prev_accel_clip[idx] + 0.05)

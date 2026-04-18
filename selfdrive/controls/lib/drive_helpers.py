@@ -22,22 +22,6 @@ def smooth_value(val, prev_val, tau, dt=DT_MDL):
   alpha = 1 - np.exp(-dt/tau) if tau > 0 else 1
   return alpha * val + (1 - alpha) * prev_val
 
-
-def get_target_speeds_from_plan(speeds, t_idxs, action_t=DT_MDL):
-  if len(speeds) == len(t_idxs):
-    v_target = np.interp(action_t, t_idxs, speeds)
-    v_target_1sec = np.interp(action_t + 1.0, t_idxs, speeds)
-  else:
-    v_target = 0.0
-    v_target_1sec = 0.0
-  return v_target, v_target_1sec
-
-
-def should_stop_with_hysteresis(v_target, v_target_1sec, vEgoStopping=0.05, *,
-                                prev_should_stop=False, enter_margin=0.0, exit_margin=0.0):
-  stop_speed = vEgoStopping + exit_margin if prev_should_stop else max(vEgoStopping - enter_margin, 0.0)
-  return v_target < stop_speed and v_target_1sec < stop_speed
-
 def clip_curvature(v_ego, prev_curvature, new_curvature, roll) -> tuple[float, bool]:
   # This function respects ISO lateral jerk and acceleration limits + a max curvature
   v_ego = max(v_ego, MIN_SPEED)
@@ -59,13 +43,15 @@ def get_accel_from_plan(speeds, accels, t_idxs, action_t=DT_MDL, vEgoStopping=0.
   if len(speeds) == len(t_idxs):
     v_now = speeds[0]
     a_now = accels[0]
-    v_target, v_target_1sec = get_target_speeds_from_plan(speeds, t_idxs, action_t)
+    v_target = np.interp(action_t, t_idxs, speeds)
     a_target = 2 * (v_target - v_now) / (action_t) - a_now
+    v_target_1sec = np.interp(action_t + 1.0, t_idxs, speeds)
   else:
     v_target = 0.0
     v_target_1sec = 0.0
     a_target = 0.0
-  should_stop = should_stop_with_hysteresis(v_target, v_target_1sec, vEgoStopping)
+  should_stop = (v_target < vEgoStopping and
+                 v_target_1sec < vEgoStopping)
   return a_target, should_stop
 
 def curv_from_psis(psi_target, psi_rate, vego, action_t):
