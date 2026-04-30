@@ -1,9 +1,12 @@
+# mazda-dev: opendbc submodule relocated to zephleggett/opendbc-sunnypilot (2026-04-03).
+# Touch this file to force `git submodule sync` to rewrite cached URLs on devices
+# upgrading from older mazda-dev snapshots that pointed at zephleggett/opendbc.git.
 [submodule "panda"]
   path = panda
   url = https://github.com/sunnyhaibin/panda.git
 [submodule "opendbc"]
   path = opendbc_repo
-  url = https://github.com/yummydirtx/opendbc.git
+  url = https://github.com/zephleggett/opendbc-sunnypilot.git
 [submodule "msgq"]
   path = msgq_repo
   url = https://github.com/commaai/msgq.git
