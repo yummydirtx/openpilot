@@ -72,7 +72,9 @@ def claim_gadget():
     json.dump({"version": 1, "gadget": str(GADGET_ROOT / "automaxxing")}, out)
 
 
-def project_live(session, worker, deadline, fps, status_path):
+def project_live(session, worker, deadline, fps, status_path, display_control=None):
+  from tools.android_auto.menu import ProjectionMenu
+  menu = ProjectionMenu()
   start = time.monotonic()
   next_frame = start
   last_status = start - 2
@@ -90,6 +92,14 @@ def project_live(session, worker, deadline, fps, status_path):
   focus_epoch = session.focus_epoch
   while time.monotonic() < deadline:
     session.pump(0.005)
+    if display_control is not None:
+      display_control.sync(session)
+    while getattr(session, "input_actions", ()):
+      command = menu.handle(session.input_actions.popleft())
+      if command in ("exit", "local"):
+        session.request_native(resume_from_head_unit=command == "exit")
+    if not session.focused:
+      menu.reset()
     now = time.monotonic()
     if session.focus_epoch != focus_epoch:
       focus_epoch = session.focus_epoch
@@ -133,10 +143,15 @@ def project_live(session, worker, deadline, fps, status_path):
         raise TimeoutError("Renderer/encoder did not produce a frame within 500 ms")
     if not worker.busy and session.focused and session.unacked < session.window and now >= next_frame:
       requested_epoch = session.focus_epoch
-      worker.request(force_keyframe=session.needs_keyframe)
+      if getattr(session, "input_channel", None) is not None:
+        worker.request(force_keyframe=session.needs_keyframe, menu=menu.snapshot())
+      else:
+        worker.request(force_keyframe=session.needs_keyframe)
       requested = now
       # Never catch up overdue frames; sample current telemetry at each request.
       next_frame = now + 1 / fps
+    if display_control is not None:
+      display_control.publish(session, valid_until=valid_until, stale=last_metadata.get("stale", True))
     if now - last_status >= 1:
       summary = {"phase": "streaming" if session.focused else "native_display", "frames_sent": session.frames_sent,
                  "frames_acked": session.acked, "max_pending": session.max_pending,
@@ -182,6 +197,7 @@ def main():
   parser.add_argument("--view", choices=("road", "hud"), default="road", help="Full passive onroad view, or HUD-only fallback")
   parser.add_argument("--stock", action="store_true", help="Use stock openpilot instead of Sunnypilot state semantics")
   parser.add_argument("--once", action="store_true", help="Exit on a session failure instead of reconnecting")
+  parser.add_argument("--managed", action="store_true", help="Require local-display supervisor heartbeats")
   args = parser.parse_args()
   if os.geteuid() != 0:
     parser.error("USB setup requires root; launch using the documented limited service")
@@ -203,6 +219,10 @@ def main():
     attempt = 0
     errors = 0
     results = []
+    display_control = None
+    if args.managed:
+      from tools.android_auto.display_control import DisplayControl
+      display_control = DisplayControl()
     try:
       while time.monotonic() < end:
         attempt += 1
@@ -231,7 +251,7 @@ def main():
               session.open_video(args.width, args.height)
               if (session.margin_width, session.margin_height) != (0, args.margin_height):
                 raise ValueError("Negotiated margins differ from renderer viewport")
-              result = project_live(session, worker, end, args.fps, args.output / "status.json")
+              result = project_live(session, worker, end, args.fps, args.output / "status.json", display_control)
               session.shutdown()
               result.update(head_unit_verified=True, shutdown_acknowledged=True)
               atomic_json(out / "result.json", result)
@@ -254,6 +274,13 @@ def main():
             break
           delay = min(10, 1 + errors)
         finally:
+          if display_control is not None:
+            try:
+              display_control.clear()
+            except OSError:
+              # An unwritable mailbox still expires locally. Never skip worker
+              # termination or owned-gadget cleanup because status publishing failed.
+              pass
           try:
             if worker is not None:
               worker.close()

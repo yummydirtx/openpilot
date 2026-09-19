@@ -1,0 +1,19 @@
+[Unit]
+Description=Automaxxing local display handoff
+After=local-fs.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/automaxxing
+Environment=PYTHONPATH=/data/automaxxing/deps:/data/automaxxing:/data/openpilot
+ExecStart=/usr/local/venv/bin/python -m tools.android_auto.control
+Restart=on-failure
+RestartSec=2
+Nice=15
+CPUAffinity=0 1 2
+MemoryMax=96M
+UMask=0022
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

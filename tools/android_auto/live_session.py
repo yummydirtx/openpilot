@@ -7,6 +7,7 @@ import time
 
 from tools.android_auto.session import field, json_fields, one, parse_fields
 from tools.android_auto.video import VideoSession, nal_units
+from tools.android_auto.input import InputDecoder, KEYS
 
 
 class PeerRequestedStop(EOFError):
@@ -26,6 +27,14 @@ class LiveVideoSession(VideoSession):
     self.max_pending = 0
     self.max_ack_seconds = 0
     self.channels = []
+    self.input_channel = None
+    self.input_decoder = InputDecoder()
+    self.input_actions = deque(maxlen=64)
+    self.allow_projection = True
+    self.resume_from_head_unit = True
+    self.native_focus_seen = False
+    self.last_ack_at = 0.0
+    self.epoch_acked = 0
 
   def discover(self):
     self.channels = super().discover()
@@ -37,6 +46,48 @@ class LiveVideoSession(VideoSession):
     self.margin_width = one(config, 3, 0)
     self.margin_height = one(config, 4, 0)
     self.window = min(self.window, 2)
+    self.open_input()
+
+  def open_input(self):
+    channels = [ch for ch in self.channels if "input_keycodes" in ch]
+    if not channels:
+      self.event("input_unavailable")
+      return
+    channel = channels[0]
+    self.input_channel = channel["id"]
+    codes = sorted(set(channel["input_keycodes"]) & KEYS.keys())
+    self.send(self.input_channel, 7, field(1, 0) + field(2, self.input_channel), control=True)
+    self._wait_input(8)
+    self.send(self.input_channel, 0x8002, b"".join(field(1, code) for code in codes))
+    self._wait_input(0x8003)
+    self.event("input_bound", channel=self.input_channel, keycodes=codes)
+
+  def _wait_input(self, kind):
+    end = time.monotonic() + 2
+    while time.monotonic() < end:
+      if not select.select([self.peer], [], [], 0.05)[0]:
+        continue
+      channel, message, data = self.receive()
+      if channel == self.input_channel and message == kind:
+        if one(parse_fields(data), 1, 0) != 0:
+          raise ValueError("Head unit rejected input binding")
+        return
+      self.handle(channel, message, data)
+    raise TimeoutError("Input channel did not become ready")
+
+  def request_native(self, *, resume_from_head_unit=True):
+    self.allow_projection = False
+    self.resume_from_head_unit = resume_from_head_unit
+    self.native_focus_seen = False
+    self.focused = False
+    self.input_decoder.reset()
+    self.input_actions.clear()
+    self.send(self.video_channel, 0x8007, field(2, 2) + field(3, 4))
+    self.event("native_focus_requested")
+
+  def request_projection(self):
+    self.allow_projection = True
+    self.send(self.video_channel, 0x8007, field(2, 1) + field(3, 4))
 
   def handle(self, channel, kind, data):
     fields = parse_fields(data)
@@ -50,9 +101,18 @@ class LiveVideoSession(VideoSession):
       self.event("control_notification", kind=kind, fields=json_fields(fields))
     elif channel == self.video_channel and kind == 0x8008:
       was_focused = self.focused
-      self.focused = one(fields, 1) in (1, 4)
+      granted = one(fields, 1) in (1, 4)
+      if not granted:
+        self.native_focus_seen = True
+        self.input_decoder.reset()
+        self.input_actions.clear()
+      elif self.native_focus_seen and self.resume_from_head_unit and one(fields, 2, 0):
+        self.allow_projection = True
+      self.focused = granted and self.allow_projection
       self.event("video_focus", focused=self.focused)
       if self.focused and not was_focused:
+        self.input_decoder.reset()
+        self.input_actions.clear()
         if self.media_started:
           self.retired_sessions.append(self.session_id)
           self.session_id += 1
@@ -61,6 +121,7 @@ class LiveVideoSession(VideoSession):
           self.pending.clear()
         self.media_started = True
         self.needs_keyframe = True
+        self.epoch_acked = 0
         self.focus_epoch += 1
         self.send(channel, 0x8001, field(1, self.session_id) + field(2, self.config_index))
     elif channel == self.video_channel and kind == 0x8004:
@@ -75,8 +136,16 @@ class LiveVideoSession(VideoSession):
         self.max_ack_seconds = max(self.max_ack_seconds, now - self.pending.popleft())
       self.unacked -= count
       self.acked += count
+      self.epoch_acked += count
+      self.last_ack_at = now
+    elif channel == self.input_channel and kind == 0x8001:
+      actions = self.input_decoder.decode(data)
+      self.event("input", actions=[{"name": a.name, "steps": a.steps} for a in actions], focused=self.focused)
+      if self.focused:
+        if len(self.input_actions) + len(actions) > 64:
+          raise ValueError("Input action queue overflow")
+        self.input_actions.extend(actions)
     else:
-      # Input is never opened or forwarded to vehicle/native UI controls.
       raise ValueError(f"Unsupported live message {channel}/{kind:#x}")
 
   def pump(self, timeout):

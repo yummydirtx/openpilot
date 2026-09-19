@@ -346,6 +346,9 @@ class Session:
         media = parse_fields(one(fields, 3))
         item["media_type"] = one(media, 1)
         item["video_configs"] = [json_fields(parse_fields(c)) for c in media.get(4, [])]
+      if 4 in fields:
+        from tools.android_auto.input import repeated_integers
+        item["input_keycodes"] = repeated_integers(parse_fields(one(fields, 4)).get(1, []))
       channels.append(item)
     self.event("discovered", channels=channels, raw_hex=raw.hex())
     return channels

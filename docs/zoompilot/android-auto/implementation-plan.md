@@ -95,7 +95,7 @@ DHU results alone never establish those hardware exits.
 | Sender focus/input interruptions | Basic video and clean shutdown pass; exercise interruptions and Commander messages | Implement required responses and restart at a keyframe before claiming robust recovery |
 | Other Mazda video modes | 720p with explicit focus passed; 480p is advertised but untested | Use the proven mode until another is measured |
 | Full camera/model rendering can coexist with recording | Profile CPU rendering and PyAV encoding; current default 8 fps, with adjacent native workload comparison | Keep HUD fallback; optimize measured bottlenecks before raising resource limits |
-| Input is rotary, keys, touch, or a combination | Log negotiated input capabilities and parked events | Keep core demo passive; defer page navigation |
+| Commander input and local handoff | DHU input/focus tests pass; Mazda accepted binding and 249/249 video frames | Menu and local switch implemented; physical button, wake, and exit tests remain in [controls](controls.md) |
 | Fork-specific state/setpoint behavior is represented correctly | Compare UI and telemetry, including MADS and invalid data | Simplify labels until semantics are verified |
 
 ## Validation scope

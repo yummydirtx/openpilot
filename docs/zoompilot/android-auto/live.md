@@ -13,7 +13,9 @@ landscape speed/MAX painters and Inter fonts, wheel/experimental icon, driver
 face pose, engagement colors, and text alerts. A `hud` view remains available as
 a lower-cost fallback. The scope is the passive 3X onroad display: no settings,
 touch interactions, projected alert audio, or head-unit control of the car or
-native UI. Native openpilot retains its own display, sounds, and controls.
+native driving settings. The optional [display handoff](controls.md) adds a
+rotary menu and local start/return controls; healthy projection can pause native
+drawing while state updates, touch input, and native audio continue.
 
 Camera/model availability and the delivery evidence below are separate. Missing
 or expired sources are suppressed and labelled; live rendering never substitutes
@@ -27,11 +29,13 @@ the earlier work and hardware constraints.
 
 ## Runtime and isolation
 
-The deployed project lives in `/data/automaxxing`. The installed
-`/data/openpilot` checkout is unchanged. Its existing hydrated fonts are read
+The projection runtime lives in `/data/automaxxing`. Standalone use leaves the
+installed checkout unchanged; the optional controls installer backs up and
+patches six native UI files for the local button and render suppression.
+Existing hydrated fonts are read
 from `/data/openpilot/openpilot/selfdrive/assets`; one copy of the project's
 shared `hud_drawing.py` is deployed under `/data/automaxxing/native` so the
-experiment does not replace installed UI modules.
+standalone renderer does not need to replace installed UI modules.
 
 | Component | Responsibility |
 | --- | --- |
@@ -213,8 +217,10 @@ frame also forces an independently decodable frame before resuming.
 Cable/session failures trigger bounded retries within the overall run duration.
 Each retry recreates the worker, transport, and two-stage accessory negotiation.
 An explicit head-unit ByeBye is acknowledged and ends the run, respecting the
-request to leave projection. Unsupported channels/messages fail the attempt;
-input and audio channels are not opened.
+request to leave projection. Unsupported channels/messages fail the attempt.
+The advertised input channel is opened and bound for rotary/menu controls;
+audio channels remain unopened. The UI-managed launcher uses one attempt per
+explicit selection, keeping native fallback after a failed connection.
 
 Normal exit stops the worker and bridge before removing only the owned gadget.
 A root-owned lease permits systemd's `ExecStopPost` recovery after its entire

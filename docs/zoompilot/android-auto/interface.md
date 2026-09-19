@@ -81,6 +81,101 @@ The projection process should compose passive renderers into its own offscreen
 target, with independent initialization and cleanup. Do not launch a second
 fullscreen native UI on the comma's display as a shortcut.
 
+## Commander controls and returning to Mazda Connect
+
+Requirement, September 19, 2026: the Mazda has no touchscreen. Its Commander
+provides rotation, press-to-select, directional pushes, Back, Home, Music, and
+Navigation buttons. The projected 3X interface needs visible selection and
+complete navigation with those controls. Retain the 3X visual layout, with a
+focus/navigation adapter for its interactive elements; scaling touch targets
+alone does not provide rotary navigation.
+
+The live session now opens the input channel, binds advertised supported keys,
+and dispatches actions to a projection-only menu. See the implemented
+[controls and handoff runbook](controls.md). Android Auto supports rotary and directional
+input, including in the [Desktop Head Unit emulator](https://developer.android.com/training/cars/testing/dhu#rotary-controller).
+Actual Mazda event codes, repeat behavior, and which shortcuts the head unit
+handles itself still need a parked capture test.
+
+Proposed interaction contract:
+
+| Control | Projection behavior |
+| --- | --- |
+| Rotate | Move the visible selection through controls in a stable order; scroll to keep it visible |
+| Press | Activate the selected control once per press |
+| Directional push | Move selection between adjacent controls or regions |
+| Back | Close the current menu or return one level; at the root, offer Mazda Connect |
+| Home, if delivered | Return to the projected road view |
+| Music / Navigation | Preserve head-unit behavior where handled locally; determine delivered events before assigning actions |
+| Mazda Connect menu item | Request return to the OEM interface without unplugging the cable |
+
+Mazda documents press-and-hold Home as the hardware route between Android Auto
+and Mazda Connect in its [Android Auto guide](https://www.mazdausa.com/siteassets/global-resources/vehicle-resources/mazda-connect/user-guides/android-auto-user-guide.pdf).
+Verify this on the installed head unit. Preserve that route independently of
+the on-screen exit. Exiting should relinquish video focus, keep the session
+available if the receiver permits, and stop rendering until projection is
+selected again. Do not repeatedly request focus and pull the user out of OEM
+settings. The existing session pauses on focus loss and requests a fresh IDR on
+return. Explicit exit and return requests now pass the DHU protocol test;
+physical Mazda focus-return testing remains pending.
+
+Do not acquire audio focus merely to display the road UI. OEM music should
+remain usable; verify playback survives entering, leaving, and returning to
+projection. When native comma rendering suppression is introduced, OEM-screen
+selection must also restore the comma's local display.
+
+Implementation order: negotiate input capabilities and log normalized events;
+exercise rotary/directional/Back input in the DHU; add visible selection and
+projection-local menu actions; implement OEM exit; then verify every physical
+button, long press, and focus transition while parked. Clear held/repeat input
+on focus loss or reconnect. Initial actions concern projection navigation and
+display options; exposing native settings or parameter-changing controls needs
+explicit action-by-action integration, rather than forwarding arbitrary clicks.
+
+## Local display handoff
+
+Requirement, September 19, 2026: provide a **Use Mazda display** button on the
+comma four, and let a touch on the comma four screen reverse the handoff. The
+backed-up native integration implements this through expiring display leases;
+see [installation and remaining physical checks](controls.md).
+
+| State / action | Required behavior |
+| --- | --- |
+| Local display | Run the normal four frontend; expose Use Mazda display from an accessible local menu |
+| Use Mazda display | Start or reuse the AA session, request video focus, and prepare the 3X renderer; keep the four display available while connecting |
+| Projection ready | After focus grant and acknowledgement of fresh projected frames, pause four drawing and put its panel to sleep; continue the 3X renderer for Mazda |
+| Touch comma screen during projection | Immediately restore the four frontend and panel; consume the entire waking gesture so it cannot activate an underlying control; then release AA video focus and pause the 3X renderer |
+| Connection or projection failure | Restore the four frontend automatically, independently of whether AA responds to the focus-release request |
+| Mazda switches to OEM screen | Restore the four frontend while Mazda is showing its own interface |
+
+Keep the authenticated connection available when supported so switching back
+does not require unplugging USB. A deliberate local tap selects local mode:
+late focus notifications or automatic reconnects must not immediately put the
+comma screen back to sleep. A new explicit Use Mazda display action, or a
+verified user selection of AA on the Mazda, can initiate another handoff. Do not
+assume every incoming focus grant represents a new user selection.
+
+Renderer selection and physical hardware identity must be separate: project
+the landscape 3X frontend with the four's actual camera geometry, and restore
+the four frontend locally. Only the selected frontend should draw continuously;
+a brief overlap while validating the handoff is acceptable. This requires a
+display coordinator and independent output targets, not changing the process's
+import-time BIG flag back and forth.
+
+The local input listener, state updates, alert handling, and fallback watchdog
+must remain active while local drawing is paused. The existing GUI loop collects
+touch events before its rendering-skip branch. The implementation keeps panel
+power on and suppresses its backlight to retain touch; actual wake still needs
+physical verification. Critical native alerts must be able
+to wake the local display. Rendering suppression must be a recoverable lease:
+projection process exit or heartbeat expiry restores the local display without
+depending on the failed renderer. Do not stop the entire native UI service.
+
+Validation must cover failed startup, touch during connection, the complete
+touch-down/up gesture, stalled encoder, unplug, OEM focus changes, late focus
+notifications, critical-alert wake, and repeated handoffs. Verify that returning
+locally succeeds even if the head unit never acknowledges the exit request.
+
 ## Freshness and resource contract
 
 The camera subscriber conflates frames, validates acquisition timestamps and

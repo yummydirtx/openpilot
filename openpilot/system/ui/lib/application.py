@@ -256,6 +256,9 @@ class GuiApplication(GuiApplicationExt):
     self._last_mouse_event: MouseEvent = MouseEvent(MousePos(0, 0), 0, False, False, False, 0.0)
 
     self._should_render = True
+    self.projection_suppressed = False
+    self.display_handoff = None
+    self.input_filter = None
 
     # Debug variables
     self._mouse_history: deque[MousePosWithTime] = deque(maxlen=MOUSE_THREAD_RATE)
@@ -622,11 +625,13 @@ class GuiApplication(GuiApplicationExt):
 
         # Store all mouse events for the current frame
         self._mouse_events = self._mouse.get_events()
+        if self.input_filter is not None:
+          self._mouse_events = self.input_filter(self._mouse_events)
         if len(self._mouse_events) > 0:
           self._last_mouse_event = self._mouse_events[-1]
 
         # Skip rendering when screen is off
-        if not self._should_render:
+        if not self._should_render or self.projection_suppressed:
           if PC:
             rl.poll_input_events()
           time.sleep(1 / self._target_fps)

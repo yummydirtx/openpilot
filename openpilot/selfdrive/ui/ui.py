@@ -19,6 +19,9 @@ def main():
   config_realtime_process(0, Priority.CTRL_HIGH)
 
   gui_app.init_window("UI")
+  if not BIG_UI:
+    from openpilot.selfdrive.ui.automaxxing import NativeDisplayHandoff
+    NativeDisplayHandoff(gui_app, ui_state)
   if BIG_UI:
     MainLayout()
   else:

@@ -114,8 +114,11 @@ Use the existing landscape comma 3X UI as the visual target, per Alex's updated
 preference. Shared native speed/MAX painters are already used in the local
 preview; the [interface plan](interface.md) maps the camera/model/alert reuse.
 Do not assume
-touch input or a particular native resolution. Commander events are optional for
-the core demo, but the session must tolerate the head unit's input messages.
+touch input or a particular native resolution. Commander events now navigate
+the projection-only menu, with explicit OEM exit and local display selection.
+The [display coordinator](controls.md) grants expiring leases to suppress native
+drawing only while video is fresh, focused, and acknowledged. State/input updates
+remain active and a local touch revokes the lease.
 
 Use monotonic timestamps and an explicit mode (`live`, `replay`, `synthetic`).
 The live worker uses a 350 ms high-rate source threshold and a separate 500 ms

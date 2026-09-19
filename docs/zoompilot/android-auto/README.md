@@ -42,6 +42,8 @@ head unit's own firmware report are recorded in the [in-car runbook](in-car.md).
   strict authentication, cleanup, and repeat commands.
 - [Live runbook](live.md): on-device rendering, isolated deployment, start/stop,
   freshness and failure behavior, measured load, and remaining validation.
+- [Controls and display handoff](controls.md): Commander menu, OEM exit, local
+  four button, tap-to-return, backed-up native installation, and pending checks.
 
 This brief owns the objective and scope. The implementation plan owns progress;
 the runbook owns experimental evidence. Label new statements as observed,
@@ -91,8 +93,10 @@ feature is outside the demo scope.
 Implemented interface: real camera and native camera/model projection geometry,
 with path/lanes/edges/leads, passive driver graphics, HUD, and text alerts. Keep a
 HUD-only fallback while measuring load and evaluating further rendering performance.
-Stretch work: Commander-driven page switching, automatic launch, and profiling
-for regular driving use.
+Commander menu navigation and a local button to start/switch displays are now
+implemented; see the controls runbook for evidence and pending physical checks.
+Further work includes native GPU rendering, hardware encoding, and driving-load
+validation.
 
 Deferred: remote start, door locks, HVAC control, wireless Android Auto, phone
 proxying, general Android apps, media/navigation integration, and replacing the

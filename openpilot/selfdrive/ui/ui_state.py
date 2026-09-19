@@ -321,6 +321,12 @@ class Device(DeviceSP):
   def _reset_interactive_timeout(self) -> None:
     self._interaction_time = time.monotonic() + self.interactive_timeout
 
+  def wake_for_projection_return(self):
+    self._reset_interactive_timeout()
+    if gui_app.sunnypilot_ui():
+      ui_state.reset_onroad_sleep_timer()
+    self._set_awake(True)
+
   def add_interactive_timeout_callback(self, callback: Callable):
     self._interactive_timeout_callbacks.append(callback)
 
@@ -374,7 +380,7 @@ class Device(DeviceSP):
     if gui_app.sunnypilot_ui():
       brightness = DeviceSP.set_onroad_brightness(ui_state, self._awake, brightness)
 
-    if not self._awake:
+    if not self._awake or gui_app.projection_suppressed:
       brightness = 0
 
     if brightness != self._last_brightness:
@@ -399,7 +405,9 @@ class Device(DeviceSP):
         callback()
     self._prev_timed_out = interaction_timeout
 
-    self._set_awake(ui_state.ignition or not interaction_timeout or PC)
+    # Keep touch electronics powered for tap-to-return; the projection override
+    # suppresses drawing and backlight independently of ordinary wakefulness.
+    self._set_awake(ui_state.ignition or not interaction_timeout or PC or gui_app.projection_suppressed)
 
   def _set_awake(self, on: bool, _ui_state=None):
     # screensaver holds _awake True, so waking is not a state change

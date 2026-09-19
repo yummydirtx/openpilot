@@ -136,6 +136,8 @@ class MiciHomeLayout(Widget):
     self._mouse_down_t: None | float = None
     self._did_long_press = False
     self._is_pressed_prev = False
+    self._aa_pressed = False
+    self._aa_rect = rl.Rectangle()
 
     self._version_text = self._get_version_text()
 
@@ -169,6 +171,10 @@ class MiciHomeLayout(Widget):
     self._version_commit_label = UnifiedLabel("", font_size=36, text_color=rl.GRAY, font_weight=FontWeight.ROMAN, max_width=480, wrap_text=False)
 
   def _update_state(self):
+    if self._aa_pressed:
+      self._mouse_down_t = None
+      self._is_pressed_prev = False
+      return
     if self.is_pressed and not self._is_pressed_prev:
       self._mouse_down_t = time.monotonic()
     elif not self.is_pressed and self._is_pressed_prev:
@@ -193,7 +199,17 @@ class MiciHomeLayout(Widget):
     self._alert_count_callback = alert_count_callback
     self._alerts_pill.set_alert_count_callback(alert_count_callback, max_severity_callback)
 
+  def _handle_mouse_press(self, mouse_pos: MousePos):
+    client = gui_app.display_handoff
+    self._aa_pressed = bool(client and client.enabled and rl.check_collision_point_rec(mouse_pos, self._aa_rect))
+
   def _handle_mouse_release(self, mouse_pos: MousePos):
+    if self._aa_pressed:
+      self._aa_pressed = False
+      client = gui_app.display_handoff
+      if client and client.enabled and rl.check_collision_point_rec(mouse_pos, self._aa_rect):
+        client.select("local" if client.mode == "project" else "project")
+      return
     if not self._did_long_press:
       relative_x = mouse_pos.x - self.rect.x
       has_alerts = self._alert_count_callback and self._alert_count_callback() > 0
@@ -276,3 +292,9 @@ class MiciHomeLayout(Widget):
     self._alerts_pill.set_position(self.rect.x + self.rect.width - self._alerts_pill.rect.width - HOME_PADDING,
                                    self.rect.y + self.rect.height - self._alerts_pill.rect.height)
     self._alerts_pill.render()
+    client = gui_app.display_handoff
+    if client and client.enabled:
+      self._aa_rect = rl.Rectangle(self.rect.x + self.rect.width - 270, self.rect.y + 133, 262, 48)
+      rl.draw_rectangle_rounded(self._aa_rect, 0.25, 8, rl.Color(36, 92, 145, 255))
+      gui_label(self._aa_rect, client.label, font_size=23, alignment=TextAlignment.CENTER,
+                alignment_vertical=TextAlignmentVertical.MIDDLE)

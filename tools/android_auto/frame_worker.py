@@ -92,14 +92,18 @@ def _worker_main(connection, frame_buffer, config):
       command = receive_control(connection)
       if command == ("stop",):
         return
-      if not isinstance(command, tuple) or len(command) != 2 or command[0] != "frame" or type(command[1]) is not bool:
+      if not isinstance(command, tuple) or len(command) not in (2, 3) or command[0] != "frame" or type(command[1]) is not bool:
         raise ValueError("Invalid frame worker request")
+      menu = command[2] if len(command) == 3 else None
       poll_started = time.monotonic()
       state = reader.poll()
-      road = None if road_reader is None else road_reader.poll()
+      road = None if road_reader is None or menu is not None and menu["view"] == "hud" else road_reader.poll()
       captured_at = time.monotonic()
       render_cpu_started = time.process_time()
       image = renderer.render(state, road=road)
+      if menu is not None and not (state.alert is not None and state.alert.size):
+        from tools.android_auto.menu import draw_menu
+        image = draw_menu(image, viewport, menu, config["assets"])
       data = encoder.encode(image, force_keyframe=command[1] or first_frame)
       first_frame = False
       if not 0 < len(data) <= MAX_FRAME_BYTES:
@@ -107,7 +111,7 @@ def _worker_main(connection, frame_buffer, config):
       # A few first-occurrence diagnostics, never a video or screenshot stream.
       # Writes are covered by the parent's watchdog.
       labels = ["stale" if state.stale else "live"]
-      road_metadata = renderer.road_metadata if road_reader is not None else None
+      road_metadata = renderer.road_metadata if road is not None else None
       if road_metadata:
         labels += [name for name in ("camera", "model") if road_metadata.get(f"{name}_displayed")]
       saved_image = None
@@ -197,7 +201,7 @@ class FrameWorker:
   def pid(self):
     return self._child.pid
 
-  def request(self, force_keyframe=False):
+  def request(self, force_keyframe=False, *, menu=None):
     if self.closed:
       raise RuntimeError("Live frame worker is closed")
     if self.busy:
@@ -209,7 +213,7 @@ class FrameWorker:
       raise RuntimeError("Live frame worker exited")
     self._requested_at = time.monotonic()
     try:
-      send_control(self._connection, ("frame", force_keyframe))
+      send_control(self._connection, ("frame", force_keyframe) if menu is None else ("frame", force_keyframe, menu))
     except BaseException:
       self.close()
       raise
