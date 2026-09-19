@@ -1,8 +1,9 @@
 # Hardware validation and experiment runbook
 
-Status: first direct-car USB/authentication/video experiments pass; see the
-[in-car evidence and repeat commands](in-car.md). Live rendering/telemetry and
-G5 validation are still pending. Follow the [implementation plan](implementation-plan.md).
+Status: direct-car USB/authentication/video and live HUD pass; see the
+[in-car evidence](in-car.md) and [live runbook](live.md). Full road-view delivery
+has passed a 174-second run; G5 is incomplete. Physical reconnect/focus tests are deferred at
+Alex's request. Follow the [implementation plan](implementation-plan.md).
 
 ## Test setup
 
@@ -80,8 +81,12 @@ explicitly chosen local directory; commit sanitized findings and artifact pointe
 
 ## G4–G5: dashboard acceptance matrix
 
-All rows below are pending. Ten minutes, three reconnects, and the 500 ms stale
-threshold are initial project targets and may be revised explicitly with evidence.
+The matrix describes acceptance targets. Live parked speed/disengaged display,
+normal cleanup, isolated worker-hang recovery, and main-process crash cleanup
+have evidence in the live runbook. A 234-second HUD run has passed; ten minutes
+and three physical reconnects remain pending. The live adapter clears high-rate
+sources at 350 ms to reserve processing time within a 500 ms sender budget.
+Neither that budget nor a video acknowledgement measures physical display latency.
 
 | Check | Procedure | Pass condition |
 | --- | --- | --- |

@@ -1,8 +1,9 @@
 # Architecture and decisions
 
-Status: direct USB transport, strict Mazda authentication, and prerecorded video
-work on the device. Live renderer/encoder integration remains proposed; see
-[in-car evidence](in-car.md).
+Status: direct USB transport, strict Mazda authentication, and live on-device
+HUD rendering/encoding work. Real camera/model composition is implemented and
+has sustained direct Mazda delivery evidence at the current 8 fps default.
+See [in-car evidence](in-car.md) and the [live runbook](live.md).
 Scope authority: [project brief](README.md).
 
 ## Runtime shape
@@ -10,6 +11,8 @@ Scope authority: [project brief](README.md).
 ```mermaid
 flowchart LR
   T["Local Cereal telemetry"] --> S["Dashboard state adapter"]
+  C["Read-only VisionIPC camera"] --> R
+  M["Model and calibration subscriptions"] --> R
   S --> R["Offscreen landscape renderer"]
   R --> E["H.264 encoder"]
   E --> A["Android Auto session and USB transport"]
@@ -28,43 +31,37 @@ Start with a manually launched experimental service outside the control loop.
 Keep privileged USB setup separate from the renderer where practical. Do not add
 automatic startup until manual start, stop, cleanup, and reconnect are reliable.
 
-## Candidate implementation
+## Implementation and protocol references
 
-Start by inspecting and building the smallest useful portion of
-[AACS](https://github.com/tomasz-grobelny/AACS), especially `AAServer`. Despite the
-name, that component faces the car and provides the role we need. Its `AAClient`
-component faces a real Android phone and is not required by our objective.
+The implemented sender is Python, using AGNOS's existing accessory driver and
+two-stage AOA negotiation. [AACS](https://github.com/tomasz-grobelny/AACS)'s
+car-facing `AAServer` supplied protocol and descriptor reference facts;
+its phone-facing `AAClient`, Odroid setup, and GStreamer/Snowmix stack are not
+runtime dependencies. No AACS implementation is vendored.
 
-AACS is a candidate, not a locked dependency. Its documented environment includes
-Odroid, GStreamer/Snowmix, and kernel-specific gadget considerations. Its install
-guide is not a script to run wholesale on AGNOS. Inspect the minimum video path,
-build requirements, license compatibility, and USB assumptions first; pin any
-reused dependency to a reviewed revision and retain attribution.
-
-Local experiment: `tools/android_auto/session.py` now implements a small Python
-phone-side TLS/framing probe against stock DHU over TCP. A current phone identity
+`tools/android_auto/session.py` implements phone-side TLS/framing over a socket
+shared by the DHU TCP and comma USB transports. A current phone identity
 imported from a verified Google-signed Android Auto APK passes DHU authentication
 and encrypted service discovery. The separate, optional sender-side verification
 of DHU fails on its certificate's date encoding with this Mac's OpenSSL. See the
-[certificate experiment](authentication.md) for evidence and limits. This is not
-yet a selection of Python for the final runtime or proof of Mazda compatibility.
+[certificate experiment](authentication.md) for evidence and limits. Strict
+mutual authentication succeeds separately with the actual Mazda on the comma.
 
 `tools/android_auto/video.py` now opens the video channel, handles focus and
 bounded acknowledgement flow, sends H.264, and closes cleanly against stock DHU.
 `preview.py` supplies a pre-rendered synthetic 3X HUD clip at multiple sizes. See
-the [video evidence](video.md). Live rendering/encoding is not yet connected to
-the session. `usb.py` now supplies a working AGNOS accessory transport with bounded
-setup/cleanup and strict head-unit verification; live integration remains pending.
+the [video evidence](video.md). `live_session.py` extends this with bounded live
+flow, focus epochs, and mandatory resume keyframes. `usb.py` supplies working
+AGNOS accessory transport. `runtime.py` drives a separately terminable
+`frame_worker.py`, which reads current telemetry, renders, and encodes each
+requested frame. A fixed shared buffer and one outstanding request prevent a
+frame backlog. `service.py` contains the manual, resource-limited launch.
 
 Treat identity provisioning as a development/deployment step separate from the
 runtime. The comma needs the certificate and matching key, not Android or the APK.
 Keep those artifacts outside Git, record expiry, and plan a refresh before the
 tested identity expires on December 23, 2026. The importer deliberately supports
 one inspected APK; updating it requires inspecting and testing the newer release.
-
-If AACS's transport cannot be adapted economically, use its behavior and the
-protocol references to implement a minimal sender on the comma. That is an
-implementation change within the agreed scope. Phone proxying is a scope change.
 
 [OpenAuto](https://github.com/opencardev/openauto) implements the receiving head
 unit, so it is useful as a development peer rather than the runtime sender.
@@ -97,19 +94,21 @@ than forwarding broken inter-frame dependencies.
 
 ## Data and presentation
 
-Initial subscriptions: `carState` and `selfdriveState`. Read `IsMetric` through
-the existing parameter API. Candidate fields are:
+`live_state.py` reads `carState`, `selfdriveState`, Sunnypilot state, panda state,
+device state, and onroad events, with legacy `controlsState` only when needed.
+It reads the native unit/visibility preferences without changing Params. Sources:
 
-| Display | Candidate source | Semantics to verify |
+| Display | Source | Implemented semantics |
 | --- | --- | --- |
-| Vehicle speed | `carState.vEgoCluster`, falling back to `vEgo` | Match existing UI fallback and unit conversion; zero speed is valid |
-| Cruise set speed | `carState.vCruiseCluster` | Match current fork's validity/sentinel and legacy fallback behavior; do not assume the same units as `vEgo` |
-| Openpilot state | `selfdriveState.state`, `enabled`, `active` | Preserve pre-enabled, overriding, and disabling distinctions |
-| Alert | `alertText1`, `alertText2`, `alertStatus`, `alertSize` | Preserve meaning and priority; native alerts continue independently |
+| Vehicle speed | `carState.vEgoCluster`, falling back to `vEgo` | Native seen-cluster fallback, TrueVEgoUI/HideVEgoUI, unit conversion; zero is valid |
+| Cruise set speed | `carState.vCruiseCluster` | Native sentinel, availability, and legacy controlsState fallback |
+| Openpilot state | `selfdriveState`, `selfdriveStateSP` | Native branch order for engaged, override, disengaged, lateral-only, and longitudinal-only |
+| Alert | `alertText1`, `alertText2`, `alertStatus`, `alertSize` | Native text and severity; native audio continues independently |
 | Data quality | Subscription validity/liveness and timestamps; `carState.canValid` | CAN validity and telemetry freshness are distinct |
 
-If individual lateral/longitudinal activity is shown later, inspect `carControl`
-and the fork's MADS handling; `enabled` alone does not mean both axes are active.
+MADS handling is derived from this fork's existing state logic; `enabled` alone
+does not mean both axes are active. Branch-parity tests cover the adapter;
+physical comparison across moving states remains pending.
 
 Use the existing landscape comma 3X UI as the visual target, per Alex's updated
 preference. Shared native speed/MAX painters are already used in the local
@@ -119,8 +118,9 @@ touch input or a particular native resolution. Commander events are optional for
 the core demo, but the session must tolerate the head unit's input messages.
 
 Use monotonic timestamps and an explicit mode (`live`, `replay`, `synthetic`).
-The proposed initial stale threshold is 500 ms without a required valid update;
-measure and revise it explicitly. Missing/stale state must display "Data
+The live worker uses a 350 ms high-rate source threshold and a separate 500 ms
+sender freshness budget, leaving time to encode an unavailable frame. Lower-rate
+device/events/calibration services have longer deadlines. Missing/stale state displays "Data
 unavailable" instead of retaining an active indicator. A new AA session starts
 with no live state until valid samples arrive.
 
@@ -131,15 +131,18 @@ head unit accepts. Then render a synthetic dashboard and feed an encoder. Only
 then attach live telemetry. This separates USB/session failures from graphics and
 codec failures.
 
-Prefer the existing hardware encoder path after evaluating its input-buffer
-requirements and ability to coexist with openpilot's encoders. Existing H.264
-support does not establish spare hardware sessions or compatibility with the
-head unit's profile/level. Existing camera streams are not rendered UI frames.
+The working encoder is isolated PyAV 16.1.0 with single-thread libx264,
+baseline/ultrafast/zerolatency and repeated codec headers. It does not claim a
+native camera encoder session. The proven negotiated mode is 1280×720/30 with
+240 total vertical margin. Source updates can run at 8, 10, 15, or 30 fps independently
+of the codec mode. The full road view defaults to 8 fps after CPU profiling;
+higher requested rates remain available for measured experiments.
 
-Software encoding on the comma is an acceptable temporary experiment if measured
-load permits it. It still satisfies direct projection. Negotiate resolution and
-frame rate rather than hardcoding the panel's physical dimensions. A simple
-dashboard should prioritize readable, fresh data over camera video.
+Rendering uses Pillow with a passive drawing backend for the shared native HUD
+painters. Camera/model composition uses copied latest VisionIPC NV12 frames and
+native calibration/projection math, without opening a second native UI window or
+GPU context. A HUD-only view remains available. Hardware encoding is a later
+optimization requiring its own input-format and concurrent-capacity evidence.
 
 ## Existing code to inspect
 
@@ -165,13 +168,13 @@ edit requirements:
 | ID | Decision | Status / rationale |
 | --- | --- | --- |
 | D1 | Direct wired projection, no intermediary | Agreed with Alex; central project objective |
-| D2 | Read-only dashboard, separate from control | Planned; isolates display/session failure |
-| D3 | Test pattern before live dashboard | Planned; establishes the hardest external dependency first |
+| D2 | Read-only dashboard, separate from control | Implemented with subscriber-only state, isolated deployment, and bounded worker |
+| D3 | Test pattern before live dashboard | Completed; synthetic then live HUD confirmed on actual Mazda |
 | D4 | Use the minimal Python sender with AGNOS's existing accessory driver | Demonstrated on Mazda; AACS supplies protocol/negotiation reference facts, with no AACS implementation vendored |
-| D5 | Use an offscreen landscape renderer | Proposed; fits the Mazda screen and keeps native UI available |
-| D6 | Manual launch before manager integration | Planned; makes experiment cleanup and diagnosis explicit |
-| D7 | Reuse the scalable comma 3X onroad interface | Agreed with Alex; native HUD code/assets now demonstrated in DHU with synthetic road/model fixtures |
+| D5 | Use an offscreen landscape renderer | Pillow CPU backend demonstrated; preserves native UI and adapts to measured margins |
+| D6 | Manual launch before manager integration | Transient systemd service, no boot/manager integration; owned-gadget crash cleanup tested |
+| D7 | Reuse the scalable comma 3X onroad interface | Live shared native HUD demonstrated; real camera/model view now prioritized by Alex |
 
-Runtime language, build layout, renderer library, encoder integration, exact video
-mode, and startup policy remain open until the corresponding experiment provides
-evidence. Keep the first implementation small enough to replace a failed choice.
+Driving-load performance, physical focus/reconnect behavior, and full visual
+parity remain experimental. Keep the synthetic and live HUD paths for
+regression diagnosis while extending the road view.

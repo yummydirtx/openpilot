@@ -1,9 +1,11 @@
 # Direct Android Auto projection
 
-Status: direct comma four → Mazda USB projection works. Alex confirmed the
-synthetic 3X HUD on the car display; the minute-long run acknowledged all 1,800
-frames. Strict Mazda certificate verification also passes. Live on-device
-rendering/telemetry and endurance/reconnect validation remain pending.
+Status: direct comma four → Mazda USB projection now includes the passive 3X
+road-camera/model view. Its completed parked run acknowledged 1,360/1,360 frames
+over 174 seconds, with no drops and strict certificate verification. The current
+CPU-rendered default is 8 fps. Alex previously confirmed the live HUD; visual
+confirmation of the full road view on the Mazda, physical reconnect/focus tests,
+and driving-load validation remain pending. See the [live runbook](live.md).
 Agreed scope: September 18, 2026, for COMMA_HACK 7.
 
 ## Objective
@@ -38,6 +40,8 @@ head unit's own firmware report are recorded in the [in-car runbook](in-car.md).
 - [Video runbook](video.md): working local projection commands and measured results.
 - [In-car runbook](in-car.md): working direct USB setup, real Mazda results,
   strict authentication, cleanup, and repeat commands.
+- [Live runbook](live.md): on-device rendering, isolated deployment, start/stop,
+  freshness and failure behavior, measured load, and remaining validation.
 
 This brief owns the objective and scope. The implementation plan owns progress;
 the runbook owns experimental evidence. Label new statements as observed,
@@ -55,8 +59,9 @@ separate data port. The display shows:
 - Openpilot state and current alert text, preserving their meaning in this fork.
 
 The visual target is the existing landscape comma 3X onroad interface, adapted to
-the head unit's negotiated usable viewport. The first preview shares native HUD
-painters and assets; its road/model scene is explicitly synthetic.
+the Mazda's measured 1280×480 usable viewport within 1280×720 video. The live HUD
+shares native painters and assets. Real camera/model composition is implemented;
+the old local preview remains an explicitly synthetic regression fixture.
 
 Core acceptance criteria:
 
@@ -83,8 +88,9 @@ compact landscape dashboard, reconnect behavior, and useful diagnostic logs.
 Implement protocol responses needed by this Mazda even when the associated user
 feature is outside the demo scope.
 
-Desired interface extension: reuse native road-camera/model/path composition after
-the base HUD and transport work. Keep a HUD-only fallback while measuring load.
+Implemented interface: real camera and native camera/model projection geometry,
+with path/lanes/edges/leads, passive driver graphics, HUD, and text alerts. Keep a
+HUD-only fallback while measuring load and evaluating further rendering performance.
 Stretch work: Commander-driven page switching, automatic launch, and profiling
 for regular driving use.
 
@@ -107,7 +113,7 @@ with Alex. A phone or companion board is not an implicit fallback for this proje
 | AA protocol references and proxy implementations exist | [open-android-auto](https://github.com/mrmees/open-android-auto), [aa-proxy-rs](https://github.com/aa-proxy/aa-proxy-rs) | References/proxies do not supply a validated standalone comma sender |
 | This checkout exposes vehicle/system telemetry and hardware H.264 encoder code | [Architecture source map](architecture.md#existing-code-to-inspect) | Encoder input, negotiated format, and concurrent capacity remain untested |
 
-No Mazda head-unit resolution, video profile, command sequence, or USB descriptor
-set has been established by experiment. Use service discovery and captures to
-determine them. Protocol names such as "car control" do not prove Mazda support
+The table above records kickoff research. Subsequent [hardware experiments](in-car.md)
+established the two-stage AOA descriptors, authenticated command sequence, and
+720p video mode. Protocol names such as "car control" do not prove Mazda support
 for those optional services.

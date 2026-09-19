@@ -26,6 +26,36 @@ UDC = "a600000.dwc3"
 DEVICE = "/dev/usb_accessory"
 
 
+def wait_accessory(gadget, timeout, report=print):
+  """Negotiate using the existing kernel driver; return only after configuration."""
+  deadline = time.monotonic() + timeout
+  negotiating = True
+  last = None
+  result = {}
+  monitor = os.open(DEVICE, os.O_RDWR)
+  try:
+    while True:
+      state = (Path("/sys/class/udc") / UDC / "state").read_text().strip()
+      if state != last:
+        report(f"USB state: {state}")
+        last = state
+      if fcntl.ioctl(monitor, 0x4D07):
+        result["aoa_start"] = True
+        report("AOA START received")
+        gadget.switch_to_accessory()
+        negotiating = False
+        deadline = time.monotonic() + 30
+        continue
+      if state == "configured" and not negotiating:
+        result["usb_speed"] = (Path("/sys/class/udc") / UDC / "current_speed").read_text().strip()
+        return result
+      if time.monotonic() > deadline:
+        raise TimeoutError("USB attachment/negotiation timed out")
+      time.sleep(0.025)
+  finally:
+    os.close(monitor)
+
+
 def write_all(fd, data):
   view = memoryview(data)
   while view:

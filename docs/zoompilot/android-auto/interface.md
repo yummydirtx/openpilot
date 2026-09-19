@@ -6,31 +6,36 @@ this to a new dashboard design. Reuse the existing renderers and assets wherever
 possible. Camera/model integration is part of the desired interface; its resource
 cost and hardware compatibility still need measurement.
 
-## What works tonight
+## Current implementation
 
-The local preview reuses the native landscape speed readout and MAX box through
+The live renderer and local preview reuse the native landscape speed readout and MAX box through
 `openpilot/selfdrive/ui/onroad/hud_drawing.py`. This is shared production drawing
 code extracted from `hud_renderer.py`; the native renderer calls the same functions.
 Its Cereal state updates, unit conversions, and interactions retain their original
 call path. Sunnypilot's overridden painters remain in their subclasses.
 
-The preview uses the checkout's exact Inter fonts, steering-wheel icon, and driver
+The renderers use the checkout's exact Inter fonts, steering-wheel icon, and driver
 face icon. `tools/android_auto/prepare_assets.py` downloads only those five files
 from the configured Git LFS server, verifies the pointer hashes, and caches them
 outside Git. It works without the `git-lfs` executable.
 
-The background road, green path, lead marker, and changing speed are **synthetic
-fixtures**. They are not camera footage or outputs from the real ModelRenderer.
-The source label remains visible in every frame. The twelve-second clip exercises
-disengaged, engaged, override, stale, and recovery states. Stale state removes the
-green path/status, replaces speed and set speed with dashes, and shows
-"Data unavailable". This fixture does not yet implement a live telemetry adapter
-or the full native alert renderer.
+`preview.py` remains an explicitly **synthetic fixture** for protocol regression.
+Its background road, path, lead, and changing speed are not live data. The
+twelve-second clip exercises disengaged, engaged, override, stale, and recovery.
+That source label remains visible in every frame.
 
-The encoded clip is streamed into stock Google DHU. Received screenshots prove
-the renderer → H.264 → encrypted AA → head-unit decoder path, beyond simply
-sending packets or viewing a local drawing window. The clip is pre-rendered;
-live rendering/encoding during the session is a next integration step.
+The separate live pipeline runs entirely on the comma. `live_state.py` preserves
+native speed, units, setpoint, MADS, and alert semantics. `live_render.py` uses a
+passive Pillow backend; `frame_worker.py` encodes each fresh snapshot with PyAV.
+Alex confirmed the live HUD on the Mazda. See [live evidence](live.md).
+
+The full passive road view adds `road_state.py` and `road_render.py`: latest
+VisionIPC camera frames, actual device/sensor intrinsics and extrinsics, model
+lane/path/edge ribbons, lead chevrons, and native icons. It follows the existing
+3X camera crop and model projection mathematics without launching another UI
+window or GPU context. The camera and model share a single transform. This is a
+read-only onroad display; settings, touchscreen/Commander interaction, fork-specific
+extra widgets, and audio remain outside this renderer.
 
 ## Scaling contract
 
@@ -48,9 +53,9 @@ origin        = (total_horizontal_margin / 2, total_vertical_margin / 2)
 ```
 
 The prototype's `Viewport` implements symmetric margins. Asymmetric content
-insets, pixel-aspect ratio, and display-specific constraints must be inspected in
-the actual Mazda response before extending this contract. Today's 480p, 720p, and
-wide configurations are test fixtures, not measurements of the Mazda display.
+insets and pixel-aspect ratios beyond this contract need separate testing. The
+actual Mazda selected 1280×720 with total vertical margin 240: 1280×480 usable,
+with 120 black pixels above and below. Other local configurations remain fixtures.
 
 Native HUD dimensions and BIG UI font scaling are retained. The actual drawing
 area gets the existing 30-unit border. Speed remains centered; MAX and steering
@@ -65,7 +70,7 @@ one viewport and calibration transform.
 | `openpilot/selfdrive/ui/onroad/hud_drawing.py` | Shared native speed and MAX painters; used by the working local preview |
 | `openpilot/selfdrive/ui/onroad/augmented_road_view.py` | Camera, model, HUD, alerts, and driver-state composition; reuse its layout/calibration approach |
 | `openpilot/selfdrive/ui/onroad/cameraview.py` | Camera subscription and GPU drawing; use actual stream/device calibration |
-| `openpilot/selfdrive/ui/onroad/model_renderer.py` | Real lane/path/lead drawing; replace the preview's synthetic road/path fixture |
+| `openpilot/selfdrive/ui/onroad/model_renderer.py` | Native ribbon, path, gradient, and lead formulas followed by the passive CPU compositor |
 | `openpilot/selfdrive/ui/onroad/alert_renderer.py` | Preserve native alert text, severity, and sizing when adding the live adapter |
 | `openpilot/selfdrive/ui/sunnypilot/onroad/` | Fork-specific visual/state extensions to evaluate after the base 3X view is working |
 
@@ -76,19 +81,28 @@ The projection process should compose passive renderers into its own offscreen
 target, with independent initialization and cleanup. Do not launch a second
 fullscreen native UI on the comma's display as a shortcut.
 
-## Next integration steps
+## Freshness and resource contract
 
-1. Prove USB and negotiated video on the Mazda with the known-good clip.
-2. Feed rendered frames into a bounded encoder/sender path during the session,
-   using the head unit's selected resolution, frame rate, and usable viewport.
-3. Attach read-only Cereal snapshots with age/validity handling. Reuse the fork's
-   actual speed, cruise, MADS, and alert semantics rather than the synthetic
-   fixture's simplified state names.
-4. Subscribe to VisionIPC and compose the existing ModelRenderer using the real
-   comma four camera/calibration data. Keep a HUD-only fallback if the added
-   encoding or readback load is too high for the demo.
-5. Measure GPU contexts, readback, encoder load, and coexistence with the native
-   comma four UI. Keep native alerts and control processes independent.
+The camera subscriber conflates frames, validates acquisition timestamps and
+camera-state metadata, then copies the selected NV12 buffer before conversion.
+It checks the producer's frame ID around the copy to detect reuse. No camera
+server, vehicle publisher, or parameter writer is created.
 
-See [the local video runbook](video.md) for commands, artifacts, and measured
-results. No actual-car milestone has passed from these local tests.
+Camera and model have independent 350 ms freshness gates. A model overlay also
+needs valid calibration and camera/model acquisition times within 150 ms and
+frame IDs within three frames. Unknown intrinsics or dimensions suppress the
+road view; expired calibration suppresses model graphics. Missing camera/model
+data leaves the fresh HUD available with an explicit unavailable indication.
+Fresh driver/radar data is gated separately. The sender's 500 ms budget includes
+the age of the sources actually drawn, including camera when HUD data is stale.
+
+The current default is 8 source frames/s in the proven 30 fps codec mode after
+CPU profiling. Measure the whole projection process tree and keep `--view hud`
+available. The worker uses one
+outstanding request, a fixed encoded-frame buffer, and a parent watchdog; the
+service retains its CPU warning/stop policy and memory cap. Hardware acceleration
+can be evaluated later if measured CPU load warrants it.
+
+See [the live runbook](live.md) for current commands and hardware evidence, and
+[the local video runbook](video.md) for the independent synthetic regression path.
+Physical focus/reconnect tests are deferred while Alex is away from the car.
