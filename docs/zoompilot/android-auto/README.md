@@ -1,6 +1,8 @@
 # Direct Android Auto projection
 
-Status: planning; no on-device or on-car validation performed.
+Status: stock DHU receives moving H.264 and a scalable comma 3X HUD preview at
+480p, 720p, and a wide viewport. Sender-side verification of DHU remains unresolved;
+USB, on-device, and on-car validation have not been performed.
 Agreed scope: September 18, 2026, for COMMA_HACK 7.
 
 ## Objective
@@ -25,6 +27,13 @@ deployed AGNOS version, and available development time still need recording.
   and the current backlog.
 - [Validation runbook](validation.md): device inspection, experiment records, and
   the final demonstration checks.
+- [Local development](local-development.md): Mac head-unit emulator setup, verified
+  bootstrap probe, and the work possible without physical hardware.
+- [Certificate experiment](authentication.md): working phone identity import,
+  reproducible authentication check, expiry, and remaining verification limits.
+- [Interface](interface.md): scalable comma 3X design, existing code reuse, and
+  the next steps toward real camera/model composition.
+- [Video runbook](video.md): working local projection commands and measured results.
 
 This brief owns the objective and scope. The implementation plan owns progress;
 the runbook owns experimental evidence. Label new statements as observed,
@@ -40,6 +49,10 @@ separate data port. The display shows:
 - Connection/data freshness and whether data is live or replayed.
 - Large vehicle speed and cruise set speed, with explicit units.
 - Openpilot state and current alert text, preserving their meaning in this fork.
+
+The visual target is the existing landscape comma 3X onroad interface, adapted to
+the head unit's negotiated usable viewport. The first preview shares native HUD
+painters and assets; its road/model scene is explicitly synthetic.
 
 Core acceptance criteria:
 
@@ -66,8 +79,9 @@ compact landscape dashboard, reconnect behavior, and useful diagnostic logs.
 Implement protocol responses needed by this Mazda even when the associated user
 feature is outside the demo scope.
 
-Stretch work, only after the core demo passes: Commander-driven page switching,
-model/path visualization, road-camera composition, automatic launch, and profiling
+Desired interface extension: reuse native road-camera/model/path composition after
+the base HUD and transport work. Keep a HUD-only fallback while measuring load.
+Stretch work: Commander-driven page switching, automatic launch, and profiling
 for regular driving use.
 
 Deferred: remote start, door locks, HVAC control, wireless Android Auto, phone

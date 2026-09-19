@@ -39,6 +39,26 @@ guide is not a script to run wholesale on AGNOS. Inspect the minimum video path,
 build requirements, license compatibility, and USB assumptions first; pin any
 reused dependency to a reviewed revision and retain attribution.
 
+Local experiment: `tools/android_auto/session.py` now implements a small Python
+phone-side TLS/framing probe against stock DHU over TCP. A current phone identity
+imported from a verified Google-signed Android Auto APK passes DHU authentication
+and encrypted service discovery. The separate, optional sender-side verification
+of DHU fails on its certificate's date encoding with this Mac's OpenSSL. See the
+[certificate experiment](authentication.md) for evidence and limits. This is not
+yet a selection of Python for the final runtime or proof of Mazda compatibility.
+
+`tools/android_auto/video.py` now opens the video channel, handles focus and
+bounded acknowledgement flow, sends H.264, and closes cleanly against stock DHU.
+`preview.py` supplies a pre-rendered synthetic 3X HUD clip at multiple sizes. See
+the [video evidence](video.md). Live rendering/encoding is not yet connected to
+the session, and USB remains a separate hardware gate.
+
+Treat identity provisioning as a development/deployment step separate from the
+runtime. The comma needs the certificate and matching key, not Android or the APK.
+Keep those artifacts outside Git, record expiry, and plan a refresh before the
+tested identity expires on December 23, 2026. The importer deliberately supports
+one inspected APK; updating it requires inspecting and testing the newer release.
+
 If AACS's transport cannot be adapted economically, use its behavior and the
 protocol references to implement a minimal sender on the comma. That is an
 implementation change within the agreed scope. Phone proxying is a scope change.
@@ -88,8 +108,10 @@ the existing parameter API. Candidate fields are:
 If individual lateral/longitudinal activity is shown later, inspect `carControl`
 and the fork's MADS handling; `enabled` alone does not mean both axes are active.
 
-Use a dedicated landscape layout rather than enlarging the comma four's portrait
-screen. Begin with state, speed, set speed, and an alert region. Do not assume
+Use the existing landscape comma 3X UI as the visual target, per Alex's updated
+preference. Shared native speed/MAX painters are already used in the local
+preview; the [interface plan](interface.md) maps the camera/model/alert reuse.
+Do not assume
 touch input or a particular native resolution. Commander events are optional for
 the core demo, but the session must tolerate the head unit's input messages.
 
@@ -145,6 +167,7 @@ edit requirements:
 | D4 | Inspect AACS as first sender candidate | Proposed; matches the required protocol role |
 | D5 | Use an offscreen landscape renderer | Proposed; fits the Mazda screen and keeps native UI available |
 | D6 | Manual launch before manager integration | Planned; makes experiment cleanup and diagnosis explicit |
+| D7 | Reuse the scalable comma 3X onroad interface | Agreed with Alex; native HUD code/assets now demonstrated in DHU with synthetic road/model fixtures |
 
 Runtime language, build layout, renderer library, encoder integration, exact video
 mode, and startup policy remain open until the corresponding experiment provides
