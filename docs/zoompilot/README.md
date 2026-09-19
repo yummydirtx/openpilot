@@ -5,6 +5,12 @@ Each file carries a Constants table (name, value, measurement, route) and a Trie
 rejected section. Rlogs and the analysis scripts live in the private zoompilot-research
 repo.
 
+Project plans live separately from those measured findings:
+
+- [Direct Android Auto projection](android-auto/README.md): COMMA_HACK 7 project
+  brief, architecture, implementation milestones, and hardware validation for
+  comma four to the factory Mazda display.
+
 - mazda-longitudinal.md: radar takeover and hand-back, CRZ_INFO checksum, stop-and-go,
   MRCC state semantics, alpha-long availability
 - mazda-lateral.md: 2022 EPS detection and flag, 1200/12/12 envelope, speed-dependent
