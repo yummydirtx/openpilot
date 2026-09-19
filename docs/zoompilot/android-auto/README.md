@@ -1,8 +1,9 @@
 # Direct Android Auto projection
 
-Status: stock DHU receives moving H.264 and a scalable comma 3X HUD preview at
-480p, 720p, and a wide viewport. Sender-side verification of DHU remains unresolved;
-USB, on-device, and on-car validation have not been performed.
+Status: direct comma four → Mazda USB projection works. Alex confirmed the
+synthetic 3X HUD on the car display; the minute-long run acknowledged all 1,800
+frames. Strict Mazda certificate verification also passes. Live on-device
+rendering/telemetry and endurance/reconnect validation remain pending.
 Agreed scope: September 18, 2026, for COMMA_HACK 7.
 
 ## Objective
@@ -17,8 +18,9 @@ a head unit during development. The final demonstration must work without it.
 
 The car has wired Android Auto and a swapped EPS that behaves like a 2022 for
 openpilot. That swap does not establish anything about infotainment compatibility;
-the target remains the actual 2021 head unit. Trim, market, head-unit firmware,
-deployed AGNOS version, and available development time still need recording.
+the target remains the actual 2021 head unit. Trim, market,
+and available development time still need recording. Deployed AGNOS and the
+head unit's own firmware report are recorded in the [in-car runbook](in-car.md).
 
 ## Documents and authority
 
@@ -34,6 +36,8 @@ deployed AGNOS version, and available development time still need recording.
 - [Interface](interface.md): scalable comma 3X design, existing code reuse, and
   the next steps toward real camera/model composition.
 - [Video runbook](video.md): working local projection commands and measured results.
+- [In-car runbook](in-car.md): working direct USB setup, real Mazda results,
+  strict authentication, cleanup, and repeat commands.
 
 This brief owns the objective and scope. The implementation plan owns progress;
 the runbook owns experimental evidence. Label new statements as observed,

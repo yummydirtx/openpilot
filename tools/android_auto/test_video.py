@@ -1,6 +1,6 @@
 import io
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from tools.android_auto.session import field
 from tools.android_auto.video import VideoSession, access_units
@@ -63,6 +63,21 @@ class TestVideo(unittest.TestCase):
     session = self.session((0, 11, field(1, 9876) + field(2, 0)))
     self.pump(session)
     self.assertEqual(session.sent, [(0, 12, field(1, 9876))])
+
+  def test_receiver_requiring_explicit_focus_request(self):
+    session = self.session((9, 0x8008, field(1, 1)))
+    session.discover = lambda: [{"id": 9, "video_configs": [{1: [2]}]}]
+    session.wait_for = Mock(side_effect=[field(1, 0), field(1, 2) + field(2, 4) + field(3, 0)])
+    session.send = Mock()
+    with patch("tools.android_auto.video.select.select", return_value=([session.peer], [], [])):
+      session.open_video(1280, 720)
+    session.send.assert_any_call(9, 0x8007, field(2, 1) + field(3, 4))
+    self.assertTrue(session.focused)
+
+  def test_duplicate_focus_does_not_restart_media_session(self):
+    session = self.session((2, 0x8008, field(1, 1)))
+    self.pump(session)
+    self.assertEqual(session.sent, [])
 
   def test_unknown_message_is_not_silently_ignored(self):
     with self.assertRaisesRegex(ValueError, "Unhandled"):

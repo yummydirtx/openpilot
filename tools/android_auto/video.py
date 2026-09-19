@@ -1,7 +1,7 @@
-"""Bounded H.264 projection experiment against a local, stock Google DHU.
+"""Bounded H.264 projection session, with a local stock-DHU command line.
 
 Wire identifiers cross-checked against AACS and observed DHU responses. This is
-phone-side TCP only, with no USB transport or live vehicle-data connection.
+also used by tools.android_auto.usb for parked car tests. No live data source yet.
 """
 
 import argparse
@@ -95,6 +95,9 @@ class VideoSession(Session):
       raise ValueError(f"Unsupported video setup response: {setup}")
     self.config_index = config
     self.event("video_setup", channel=self.video_channel, width=width, height=height, window=self.window, config=config)
+    # Some receivers grant focus automatically (DHU); Mazda waits for a request.
+    # VideoFocusRequest: field 2 = PROJECTED(1), field 3 = USER_SELECTION(4).
+    self.send(self.video_channel, 0x8007, field(2, 1) + field(3, 4))
     deadline = time.monotonic() + 5
     while not self.focused:
       if time.monotonic() >= deadline:
@@ -109,9 +112,10 @@ class VideoSession(Session):
     if channel == 0 and kind == 11:
       self.send(0, 12, field(1, one(fields, 1)))
     elif channel == self.video_channel and kind == 0x8008:
+      was_focused = self.focused
       self.focused = one(fields, 1) == 1
       self.event("video_focus", focused=self.focused)
-      if self.focused:
+      if self.focused and not was_focused:
         self.send(channel, 0x8001, field(1, self.session_id) + field(2, self.config_index))
     elif channel == self.video_channel and kind == 0x8004:
       count = one(fields, 2, 0)

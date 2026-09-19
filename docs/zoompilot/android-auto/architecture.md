@@ -1,6 +1,8 @@
 # Architecture and decisions
 
-Status: proposed architecture; hardware gates are pending.
+Status: direct USB transport, strict Mazda authentication, and prerecorded video
+work on the device. Live renderer/encoder integration remains proposed; see
+[in-car evidence](in-car.md).
 Scope authority: [project brief](README.md).
 
 ## Runtime shape
@@ -51,7 +53,8 @@ yet a selection of Python for the final runtime or proof of Mazda compatibility.
 bounded acknowledgement flow, sends H.264, and closes cleanly against stock DHU.
 `preview.py` supplies a pre-rendered synthetic 3X HUD clip at multiple sizes. See
 the [video evidence](video.md). Live rendering/encoding is not yet connected to
-the session, and USB remains a separate hardware gate.
+the session. `usb.py` now supplies a working AGNOS accessory transport with bounded
+setup/cleanup and strict head-unit verification; live integration remains pending.
 
 Treat identity provisioning as a development/deployment step separate from the
 runtime. The comma needs the certificate and matching key, not Android or the APK.
@@ -164,7 +167,7 @@ edit requirements:
 | D1 | Direct wired projection, no intermediary | Agreed with Alex; central project objective |
 | D2 | Read-only dashboard, separate from control | Planned; isolates display/session failure |
 | D3 | Test pattern before live dashboard | Planned; establishes the hardest external dependency first |
-| D4 | Inspect AACS as first sender candidate | Proposed; matches the required protocol role |
+| D4 | Use the minimal Python sender with AGNOS's existing accessory driver | Demonstrated on Mazda; AACS supplies protocol/negotiation reference facts, with no AACS implementation vendored |
 | D5 | Use an offscreen landscape renderer | Proposed; fits the Mazda screen and keeps native UI available |
 | D6 | Manual launch before manager integration | Planned; makes experiment cleanup and diagnosis explicit |
 | D7 | Reuse the scalable comma 3X onroad interface | Agreed with Alex; native HUD code/assets now demonstrated in DHU with synthetic road/model fixtures |

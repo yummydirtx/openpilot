@@ -1,7 +1,7 @@
-"""Experimental phone-side AA session for a loopback DHU; not a USB implementation.
+"""Experimental phone-side AA session over a socket-compatible byte transport.
 
 Protocol facts referenced from AACS (https://github.com/tomasz-grobelny/AACS).
-Only the services needed by the local video experiment are implemented.
+Only the services needed by the DHU and parked Mazda video experiments are implemented.
 """
 
 import json

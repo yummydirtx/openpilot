@@ -5,7 +5,10 @@ imported from Android Auto 17.6.663454-release**. The local Python sender comple
 TLS 1.2, receives Android Auto authentication status 0, and exchanges encrypted
 service-discovery messages. This resolves the receiver's rejection of our
 self-signed certificate in the local experiment. Subsequent [video experiments](video.md)
-also pass. Mazda acceptance and full mutual verification remain unproven.
+also pass. **September 19 update:** the actual Mazda accepts this identity, and
+strict reverse verification of the Mazda certificate also passes on the comma's
+OpenSSL 3.0.13. See the [in-car experiment](in-car.md). The DHU-specific date-format
+failure described below remains a separate local-emulator issue.
 
 ## What changed
 

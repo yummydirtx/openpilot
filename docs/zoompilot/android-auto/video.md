@@ -5,6 +5,10 @@ Observed September 18, 2026: a phone-free Python sender projects moving H.264 in
 same transport and decoder. The final target remains comma four → wired Mazda;
 this runbook describes local TCP development, not USB or actual-car validation.
 
+September 19 update: [direct USB projection to the Mazda now works](in-car.md),
+including a user-confirmed minute-long synthetic HUD replay. The device sender
+uses the same video session with an explicit display-focus request.
+
 ## Results
 
 | Experiment | Frames sent / acknowledged | Frame rate | Evidence directory under `.cache/automaxxing/` |

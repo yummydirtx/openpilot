@@ -1,7 +1,8 @@
 # Hardware validation and experiment runbook
 
-Status: all device/car experiments pending. Follow the gate order in the
-[implementation plan](implementation-plan.md).
+Status: first direct-car USB/authentication/video experiments pass; see the
+[in-car evidence and repeat commands](in-car.md). Live rendering/telemetry and
+G5 validation are still pending. Follow the [implementation plan](implementation-plan.md).
 
 ## Test setup
 
