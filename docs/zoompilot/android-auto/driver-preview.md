@@ -5,8 +5,13 @@ first Device row, accessible with the Commander. Automaxxing
 replaces that menu action's older 3X preview with a landscape adaptation of the
 C4 preview: mirrored/enhanced cabin camera, face box, eye and sunglasses
 indicators, animated driver pose, awareness percentage, and monitoring alerts.
-The camera retains the C4 crop and aspect ratio; status information occupies a
-separate column beside it. The normal physical-display previews are unchanged.
+The camera fills the usable display behind compact translucent controls and a
+small monitoring panel in the lower-right corner. On the Mazda this is
+1280×480, approximately 1.9× the previous 854×382 camera area. The C4 camera
+composition and face box use the same uniform scale; overflow is cropped to
+fill the wider display rather than stretched. Mirroring and enhancement remain
+the C4's own. The tested C4 supplies a native 1344×760 cabin-camera buffer,
+sampled directly by the GPU. The normal physical-display previews are unchanged.
 
 The preview is available either offroad or with fresh vehicle data confirming
 **Park, speed below 0.01 m/s, and no active longitudinal or lateral control**.
@@ -71,3 +76,11 @@ renderer; its landscape layout was visually checked. The ignition-on Park gate
 is covered by tests; the new preview still needs a
 physical Mazda display/Commander check in Park. Private diagnostic images and
 results are under `/data/automaxxing/driver-preview-probe-v5`, outside Git.
+
+The full-screen overlay revision also passed the live C4 probe, including
+Commander Reset, Back, Home, Music, idle expiry, and camera cleanup. Its layout
+check additionally uses isolated synthetic face/eye/sunglasses/alert data in
+the offscreen renderer; those samples are never published to the device's
+monitoring or audio services. This checks small-overlay composition separately
+from the real live-stream test. Diagnostics are saved privately under
+`/data/automaxxing/driver-preview-overlay-probe-v4`.

@@ -11,11 +11,13 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
+from unittest.mock import patch
 
 
 def main():
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument("--output", type=Path, required=True)
+  parser.add_argument("--layout-fixtures", action="store_true", help="Save explicitly synthetic monitoring-overlay layout checks")
   args = parser.parse_args()
   args.output.mkdir(parents=True, exist_ok=False, mode=0o700)
   from tools.android_auto.native_identity import native_identity
@@ -90,14 +92,23 @@ def main():
       baseline_callbacks = len(renderer.state._offroad_transition_callbacks) - 1
       frame().save(args.output / "starting.png")
       end = time.monotonic() + 30
+      live_since = None
       while time.monotonic() < end:
         image = frame()
         if preview.camera_displayed and preview.monitoring_displayed:
+          if live_since is None:
+            live_since = time.monotonic()
+          if time.monotonic() - live_since < 2:
+            time.sleep(.04)
+            continue  # Allow exposure/IR illumination to settle before visual QA.
           image.save(args.output / "preview.png")
           result["live_camera_and_monitoring"] = True
+          camera = preview._camera_view.frame
+          result["camera_source_size"] = [camera.width, camera.height]
           result["online_cpus_during_preview"] = Path("/sys/devices/system/cpu/online").read_text().strip()
           result["metadata"] = renderer.metadata(time.monotonic())
           break
+        live_since = None
         time.sleep(.04)
       else:
         state = renderer.state.sm
@@ -112,6 +123,34 @@ def main():
                    "processes": {p.name: p.running for p in state["managerState"].processes
                                  if p.name in ("camerad", "dmonitoringmodeld", "dmonitoringd", "selfdrived")}}
         raise RuntimeError("Preview sources unavailable: " + json.dumps(details))
+
+      if args.layout_fixtures:
+        # Change only this offscreen renderer's subscribers. Never publish
+        # synthetic monitoring data or pass it to the preview sound host.
+        frame()
+        state = renderer.state.sm
+        dm = state["driverMonitoringState"].as_builder()
+        ds = state["driverStateV2"].as_builder()
+        dm.activePolicy, dm.alertLevel = "vision", "three"
+        dm.visionPolicyState.faceDetected = True
+        dm.visionPolicyState.awarenessPercent = 42
+        dm.visionPolicyState.pose.pitch, dm.visionPolicyState.pose.yaw = .15, .3
+        for data in (ds.leftDriverData, ds.rightDriverData):
+          data.facePosition = [-.3, .15]
+          data.faceOrientationStd = [.05, .05, .05]
+          data.leftEyeProb, data.rightEyeProb, data.sunglassesProb = .9, .2, .7
+        fixtures = {"driverMonitoringState": dm.as_reader(), "driverStateV2": ds.as_reader()}
+        with patch.object(renderer.state, "update"), patch.dict(state.data, fixtures), \
+             patch.dict(state.recv_time, {}), patch.dict(state.logMonoTime, {}):
+          for _ in range(3):
+            for name in fixtures:
+              state.recv_time[name] = time.monotonic()
+              state.logMonoTime[name] = int(state.recv_time[name] * 1e9)
+            image = renderer.render()
+          assert preview.monitoring_displayed, "Fixture render lost its live camera/data freshness"
+          image.save(args.output / "synthetic-overlay-layout.png")
+        result["synthetic_overlay_layout_saved"] = True
+        frame()  # Resume real subscriptions before reset and cleanup checks.
 
       target = next(t for t in renderer.input.previous if t.widget is preview._reset)
       renderer.input.selected = target.key
