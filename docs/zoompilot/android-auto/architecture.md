@@ -1,5 +1,13 @@
 # Architecture and decisions
 
+**Native frontend update (September 19):** `--view native` now uses the installed
+3X `MainLayout`, full settings tree, and original GPU road renderer in an isolated
+EGL pbuffer. It supports Commander focus/scrolling and native widget callbacks;
+those callbacks can change settings. An isolated render/encode benchmark reached
+26.07 fps; production cadence adapts to measured CPU load. The `road`/`hud` modes
+below remain the earlier read-only CPU fallback. See [controls.md](controls.md)
+for the current implementation, installation, evidence, and remaining checks.
+
 Status: direct USB transport, strict Mazda authentication, and live on-device
 HUD rendering/encoding work. Real camera/model composition is implemented and
 has sustained direct Mazda delivery evidence at the current 8 fps default.

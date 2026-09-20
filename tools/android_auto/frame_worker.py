@@ -58,6 +58,9 @@ def receive_control(connection):
 
 
 def _worker_main(connection, frame_buffer, config):
+  if config["view"] == "native":
+    from tools.android_auto.native_worker import run
+    return run(connection, frame_buffer, config)
   encoder = None
   road_reader = None
   try:
@@ -163,14 +166,15 @@ class FrameWorker:
                frame_timeout=0.5, view="road", _target=None):
     if not 0 < startup_timeout <= 30 or not 0 < frame_timeout <= 0.5:
       raise ValueError("Use startup <=30 seconds and frame watchdog <=500 ms")
-    if view not in ("road", "hud"):
-      raise ValueError("View must be road or hud")
+    if view not in ("road", "hud", "native"):
+      raise ValueError("View must be road, hud, or native")
     context = multiprocessing.get_context("spawn")
     self._frame_buffer = context.RawArray("B", MAX_FRAME_BYTES)
     self._connection, child_connection = context.Pipe(duplex=True)
     self._requested_at = None
     self.frame_timeout = frame_timeout
     self.initial_cpu_seconds = 0.0
+    self.native = view == "native"
     self.closed = False
     config = {"viewport": viewport, "assets": str(assets), "hud_path": None if hud_path is None else str(hud_path),
               "sunnypilot": sunnypilot, "fps": fps, "view": view, "output": None if output is None else str(output)}

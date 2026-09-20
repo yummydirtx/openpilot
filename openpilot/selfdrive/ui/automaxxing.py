@@ -4,13 +4,14 @@ import time
 import subprocess
 from pathlib import Path
 
-from openpilot.system.ui.lib.display_handoff import HandoffClient
+from openpilot.system.ui.lib.display_handoff import HandoffClient, STATE_DIR, read_json, fresh
 
 
 class NativeDisplayHandoff:
   def __init__(self, app, ui_state):
     self.app, self.ui_state = app, ui_state
     self._starter = None
+    self._last_action = None
     enabled = Path("/data/automaxxing/native-ui-enabled").is_file()
     self.client = HandoffClient(starter=self.start_supervisor if enabled else None)
     app.display_handoff = self.client
@@ -35,6 +36,14 @@ class NativeDisplayHandoff:
                    or time.monotonic() - sm.recv_time["selfdriveState"] > 0.5)
     was_suppressed = self.client.suppressed
     events = self.client.tick(events, critical=critical)
+    action = read_json(STATE_DIR / "action.json")
+    if (self.client.mode == "project" and action.get("token") == self.client.token
+        and fresh(action, time.monotonic()) and action.get("id") != self._last_action and action.get("action") == "bookmark"):
+      self._last_action = action["id"]
+      # Reuse the existing UI publisher; the projection must not create a
+      # second publisher for bookmarkButton/userBookmark.
+      if self.app._nav_stack and hasattr(self.app._nav_stack[0], "_on_bookmark_clicked"):
+        self.app._nav_stack[0]._on_bookmark_clicked()
     self.app.projection_suppressed = self.client.suppressed
     if was_suppressed and not self.client.suppressed:
       from openpilot.selfdrive.ui.ui_state import device

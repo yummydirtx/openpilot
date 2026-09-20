@@ -87,8 +87,10 @@ class HandoffClient:
         self.mode = "local"
 
   def tick(self, events=(), *, critical=False, now=None):
-    now = time.monotonic() if now is None else now
     status = read_json(self.state_dir / "status.json")
+    # Sample after the read: a concurrent atomic rename can publish a stamp
+    # newer than a clock sampled before opening the file.
+    now = time.monotonic() if now is None else now
     was_available = self.available
     self.available = fresh(status, now) and status.get("phase") in ("local", "connecting", "projecting", "failed")
     self.phase = status.get("phase", "local") if self.available else "unavailable"
@@ -97,7 +99,7 @@ class HandoffClient:
       self.select("local")
     if self.phase == "failed" and self.mode == "project":
       self.select("local")
-    if self.available and status.get("token") == self.token and status.get("local_requested") is True:
+    if self.mode == "project" and self.available and status.get("token") == self.token and status.get("local_requested") is True:
       self.select("local")
     # A first touch is a display switch, never a click through to a native widget.
     waking = was_suppressed and any(e.left_down or e.left_pressed for e in events)

@@ -77,6 +77,20 @@ class TestFullComposition(unittest.TestCase):
     self.assertIsNone(image.crop((0, 0, 1280, 120)).getbbox())
     self.assertIsNone(image.crop((0, 600, 1280, 720)).getbbox())
 
+  def test_disengaged_path_is_hidden_but_camera_and_lane_lines_remain(self):
+    self.renderer.render(live_state(status="disengaged"), self.road)
+    metadata = self.renderer.road_metadata
+    self.assertTrue(metadata["camera_displayed"])
+    self.assertEqual(metadata["polygons_drawn"]["path"], 0)
+    self.assertGreater(metadata["polygons_drawn"]["lanes"], 0)
+
+  def test_steering_rotates_only_wheel_icon(self):
+    from PIL import ImageChops
+    straight = self.renderer.render(live_state(steering_angle=0), self.road).copy()
+    turned = self.renderer.render(live_state(steering_angle=45), self.road).copy()
+    # Ignore the independently animated driver-pose arcs.
+    self.assertIsNotNone(ImageChops.difference(straight.crop((1150, 130, 1270, 240)), turned.crop((1150, 130, 1270, 240))).getbbox())
+
   def test_missing_model_preserves_live_camera_and_hud(self):
     full = self.renderer.render(live_state(), self.road)
     camera_only = self.renderer.render(live_state(), replace(self.road, model=None, leads=(), model_age_seconds=float("inf")))

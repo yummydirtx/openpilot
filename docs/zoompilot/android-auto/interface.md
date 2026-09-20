@@ -1,5 +1,13 @@
 # Scalable comma 3X interface
 
+**Native frontend update (September 19):** `--view native` now uses the installed
+3X `MainLayout`, full settings tree, and original GPU road renderer in an isolated
+EGL pbuffer. It supports Commander focus/scrolling and native widget callbacks;
+those callbacks can change settings. An isolated render/encode benchmark reached
+26.07 fps; production cadence adapts to measured CPU load. The `road`/`hud` modes
+below remain the earlier read-only CPU fallback. See [controls.md](controls.md)
+for the current implementation, installation, evidence, and remaining checks.
+
 Decision, September 18, 2026: target the familiar **landscape comma 3X onroad
 interface**, scaled and adapted to the Mazda's negotiated viewport. Alex prefers
 this to a new dashboard design. Reuse the existing renderers and assets wherever

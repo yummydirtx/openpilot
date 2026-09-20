@@ -51,8 +51,8 @@ def main():
   started_token = read_json(REQUEST_DIR / "request.json").get("token")
   try:
     while not stopping:
-      now = time.monotonic()
       request = read_json(REQUEST_DIR / "request.json")
+      now = time.monotonic()
       if valid_request(request, now):
         token, mode = request["token"], request["mode"]
       else:
@@ -66,7 +66,7 @@ def main():
         if not active and process is None:
           output = ROOT / f"interactive-{uuid.uuid4().hex[:12]}"
           process = subprocess.Popen([PYTHON, "-m", "tools.android_auto.service", "start", "--managed", "--once",
-                                      "--duration", "7200", "--output", output.name], cwd=ROOT)
+                                      "--duration", "7200", "--view", "native", "--fps", "30", "--output", output.name], cwd=ROOT)
           phase = "connecting"
         started_token = token
       if process is not None and process.poll() is not None:
@@ -74,6 +74,7 @@ def main():
           phase = "failed"
         process = None
       projection = read_json(STATE_DIR / "projection.json")
+      now = time.monotonic()
       matched = fresh(projection, now) and projection.get("token") == token
       ready = mode == "project" and matched and projection.get("ready") is True
       if matched:

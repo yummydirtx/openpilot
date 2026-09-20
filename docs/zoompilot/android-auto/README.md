@@ -1,12 +1,12 @@
 # Direct Android Auto projection
 
-Status: direct comma four → Mazda USB projection now includes the passive 3X
-road-camera/model view. Its completed parked run acknowledged 1,360/1,360 frames
-over 174 seconds, with no drops and strict certificate verification. The current
-CPU-rendered default is 8 fps. Alex previously confirmed the live HUD; visual
-confirmation of the full road view on the Mazda, physical reconnect/focus tests,
-and driving-load validation remain pending. See the [live runbook](live.md).
-Agreed scope: September 18, 2026, for COMMA_HACK 7.
+Status: the direct comma four → Mazda connection works and Alex has tested it.
+The new `native` backend ports the installed 3X frontend, including all settings
+categories, onto an offscreen Adreno surface. Its isolated render/encode benchmark
+reached 26.07 fps, compared with the previous 8 fps CPU compositor. The settings
+launcher, disengaged path, steering icon, and heartbeat race are addressed in this
+revision. Long-session and driving-load validation remain open. See
+[controls and evidence](controls.md).
 
 ## Objective
 

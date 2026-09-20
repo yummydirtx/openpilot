@@ -1,6 +1,7 @@
 """Projection side of the optional native-display handoff."""
 
 import time
+import uuid
 
 from openpilot.system.ui.lib.display_handoff import STATE_DIR, fresh, read_json, write_json
 
@@ -9,17 +10,19 @@ class DisplayControl:
   def __init__(self, state_dir=STATE_DIR):
     self.root = state_dir
     self.token = None
+    self.mode = None
     self.last_write = -1.0
     self.ack_baseline = 0
 
   def sync(self, session):
-    now = time.monotonic()
     intent = read_json(self.root / "intent.json")
+    now = time.monotonic()
     if not fresh(intent, now) or intent.get("mode") not in ("local", "project"):
       raise RuntimeError("Display supervisor heartbeat expired")
-    if self.token != intent.get("token"):
+    if self.token != intent.get("token") or self.mode != intent["mode"]:
       first = self.token is None
       self.token = intent["token"]
+      self.mode = intent["mode"]
       self.ack_baseline = session.acked
       if intent["mode"] == "local":
         session.request_native(resume_from_head_unit=False)
@@ -40,3 +43,6 @@ class DisplayControl:
 
   def clear(self):
     write_json(self.root / "projection.json", {"at": time.monotonic(), "token": self.token, "ready": False, "phase": "local"})
+
+  def bookmark(self):
+    write_json(self.root / "action.json", {"at": time.monotonic(), "token": self.token, "action": "bookmark", "id": uuid.uuid4().hex}, mode=0o644)

@@ -18,7 +18,7 @@ def main():
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument("--duration", type=float, default=20)
   parser.add_argument("--fps", type=int, choices=(8, 10, 15, 30), default=8)
-  parser.add_argument("--view", choices=("road", "hud"), default="road")
+  parser.add_argument("--view", choices=("road", "hud", "native"), default="road")
   parser.add_argument("--output", type=Path, required=True)
   parser.add_argument("--assets", type=Path, default=Path("/data/openpilot/openpilot/selfdrive/assets"))
   parser.add_argument("--hud-path", type=Path, default=Path("native/hud_drawing.py"))
@@ -28,7 +28,7 @@ def main():
     parser.error("Preview duration must be 1–120 seconds")
   args.output.mkdir(parents=True, exist_ok=False, mode=0o700)
   worker = FrameWorker(Viewport(1280, 720, 0, 240), args.assets, args.hud_path,
-                       sunnypilot=not args.stock, output=args.output, view=args.view)
+                       sunnypilot=not args.stock, output=args.output, view=args.view, startup_timeout=30 if args.view == "native" else 10)
   started = time.monotonic()
   end = started + args.duration
   next_frame = started

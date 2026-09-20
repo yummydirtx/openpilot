@@ -23,10 +23,11 @@ class MainState(IntEnum):
 
 
 class MainLayout(Widget):
-  def __init__(self):
+  def __init__(self, bookmark_callback=None):
     super().__init__()
 
-    self._pm = messaging.PubMaster(['bookmarkButton', 'userBookmark'])
+    self._bookmark_callback = bookmark_callback
+    self._pm = messaging.PubMaster(['bookmarkButton', 'userBookmark']) if bookmark_callback is None else None
 
     self._sidebar = Sidebar()
     self._current_mode = MainState.HOME
@@ -115,6 +116,9 @@ class MainLayout(Widget):
     self.open_settings(PanelType.DEVICE)
 
   def _on_bookmark_clicked(self):
+    if self._bookmark_callback is not None:
+      self._bookmark_callback()
+      return
     for service in ('bookmarkButton', 'userBookmark'):
       msg = messaging.new_message(service, valid=True)
       self._pm.send(service, msg)

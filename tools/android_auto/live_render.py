@@ -192,7 +192,8 @@ class LiveRenderer:
       selfdrive_age = road.selfdrive_age_seconds + max(0, time.monotonic() - road.captured_at)
       selfdrive_fresh = selfdrive_age <= 0.35
       self._icon("experimental" if selfdrive_fresh and road.experimental_mode else "chffr_wheel", width - 156, 156,
-                 180 if state.stale or not selfdrive_fresh or not road.engageable else 255)
+                 180 if state.stale or not selfdrive_fresh or not road.engageable else 255,
+                 rotation=0.0 if state.stale else state.steering_angle)
       self.road_metadata["wheel_state_displayed"] = selfdrive_fresh
       if selfdrive_fresh:
         self.road_metadata["display_age_seconds"] = max(self.road_metadata.get("display_age_seconds") or 0, selfdrive_age)
@@ -253,7 +254,7 @@ class LiveRenderer:
       (box[2] - box[0], box[3] - box[1]), Image.Resampling.NEAREST)
     self.backend.image.paste(gradient, box[:2], gradient)
 
-  def _icon(self, name, x, y, opacity, *, background_alpha=166):
+  def _icon(self, name, x, y, opacity, *, background_alpha=166, rotation=0.0):
     b = self.backend
     if name not in self._icons:
       path = b.assets / "icons" / f"{name}.png"
@@ -272,6 +273,8 @@ class LiveRenderer:
       font = b.font("Bold", 35)
       b.draw.text((px - font.getlength("EXP") / 2, py), "EXP", font=font, fill=(255, 255, 255, opacity))
     else:
+      if name == "chffr_wheel" and rotation:
+        icon = icon.rotate(rotation, resample=Image.Resampling.BICUBIC)
       if opacity < 255:
         icon = icon.copy()
         icon.putalpha(icon.getchannel("A").point([round(v * opacity / 255) for v in range(256)]))

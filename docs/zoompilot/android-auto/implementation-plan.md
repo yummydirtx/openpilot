@@ -1,11 +1,12 @@
 # Implementation plan
 
-Current phase: **full passive 3X road view implemented and delivered to the Mazda**.
-The completed parked run acknowledged 1,360/1,360 frames in 174 seconds at roughly
-8 fps, without drops. G1–G3 have actual-car evidence; G4 has live HUD visual
-confirmation and full-road delivery evidence. Worker-hang recovery and process-group
-crash cleanup passed. G5 remains incomplete. Alex deferred physical reconnect/focus
-tests while away from the car. See the [live runbook](live.md).
+Current phase: **native 3X frontend and full-menu integration**. Alex confirmed
+the prior implementation worked and supplied six follow-up findings. The new
+backend uses the real GPU widgets; a device-only benchmark reached 26.07 fps,
+and a navigation probe reached all 16 settings categories without changing settings.
+The four's launcher moves to its first native settings card. Heartbeat validation
+now avoids a concurrent-write clock race. Sustained AA and driving-load checks
+remain open; see [controls and evidence](controls.md).
 Objective and completion criteria: [project brief](README.md).
 
 The gates below are sequential where they depend on hardware evidence. A laptop
@@ -28,7 +29,7 @@ A gate's time box triggers diagnosis and reprioritization, not automatic success
 or abandonment. If a gate blocks the direct architecture, save the last successful
 stage and failure evidence before making further changes. Keep a measured HUD-only
 fallback, but camera/model graphics are now explicitly requested work. Input
-navigation and automatic startup remain deferred.
+navigation is implemented; automatic startup remains deferred.
 
 ## First work session
 

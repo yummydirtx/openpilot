@@ -138,7 +138,7 @@ class UIState(UIStateSP):
   def is_offroad(self) -> bool:
     return not self.started
 
-  def update(self) -> None:
+  def update(self, *, update_display: bool = True) -> None:
     self.prime_state.start()  # start thread after manager forks ui
     if self._params_thread is None:
       self._params_thread = threading.Thread(target=self._params_refresh_worker, daemon=True)
@@ -148,8 +148,9 @@ class UIState(UIStateSP):
     self._update_state()
     self._update_status()
     self._update_chestnut_state()
-    device.update()
-    UIStateSP.update(self)
+    if update_display:
+      device.update()
+      UIStateSP.update(self)
 
   def _params_refresh_worker(self):
     drop_realtime()

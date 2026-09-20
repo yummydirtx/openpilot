@@ -14,7 +14,8 @@ import subprocess
 
 FILES = ("openpilot/system/ui/lib/application.py", "openpilot/system/ui/lib/display_handoff.py",
          "openpilot/selfdrive/ui/ui.py", "openpilot/selfdrive/ui/ui_state.py",
-         "openpilot/selfdrive/ui/mici/layouts/home.py", "openpilot/selfdrive/ui/automaxxing.py")
+         "openpilot/selfdrive/ui/mici/layouts/home.py", "openpilot/selfdrive/ui/automaxxing.py",
+         "openpilot/selfdrive/ui/sunnypilot/mici/layouts/settings.py", "openpilot/selfdrive/ui/layouts/main.py")
 SERVICE = Path("/run/systemd/system/automaxxing-display.service")
 CHECKOUT = Path("/data/openpilot")
 BACKUP = Path("/data/automaxxing/native-ui-backup")

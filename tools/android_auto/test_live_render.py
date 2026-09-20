@@ -174,6 +174,24 @@ class TestLiveEncoder(unittest.TestCase):
     with self.assertRaises(RuntimeError):
       encoder.encode(Image.new("RGB", (800, 480)))
 
+  def test_gpu_rgba_readback_encodes_with_correct_orientation_and_colors(self):
+    import av
+    from PIL import Image
+    from tools.android_auto.live_encode import H264Encoder
+    image = Image.new("RGBA", (800, 480), (15, 35, 160, 255))
+    image.paste((180, 30, 20, 255), (0, 0, 800, 240))
+    encoder = H264Encoder(800, 480)
+    try:
+      packet = encoder.encode_rgba(image.tobytes(), force_keyframe=True)
+      with self.assertRaises(ValueError):
+        encoder.encode_rgba(b"short")
+    finally:
+      encoder.close()
+    decoder = av.CodecContext.create("h264", "r")
+    decoded = decoder.decode(av.Packet(packet))[0].to_image()
+    for point in ((400, 100), (400, 380)):
+      self.assertTrue(all(abs(a-b) < 8 for a, b in zip(decoded.getpixel(point), image.getpixel(point)[:3], strict=True)))
+
 
 if __name__ == "__main__":
   unittest.main()

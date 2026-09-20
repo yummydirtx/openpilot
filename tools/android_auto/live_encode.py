@@ -41,6 +41,19 @@ class H264Encoder:
     if image.mode != "RGB" or image.size != (self.width, self.height):
       raise ValueError("Encoder expects an RGB image with the negotiated dimensions")
     frame = self.av.VideoFrame.from_image(image)
+    return self._encode_frame(frame, force_keyframe)
+
+  def encode_rgba(self, buffer, *, force_keyframe=False):
+    """Encode the GPU's final RGBA readback without intermediate RGB images."""
+    if self.closed:
+      raise RuntimeError("Encoder has been closed")
+    frame = self.av.VideoFrame(self.width, self.height, "rgba")
+    if frame.planes[0].line_size != self.width * 4 or len(buffer) != self.width * self.height * 4:
+      raise ValueError("GPU readback must be tightly packed RGBA at the negotiated dimensions")
+    frame.planes[0].update(buffer)
+    return self._encode_frame(frame, force_keyframe)
+
+  def _encode_frame(self, frame, force_keyframe):
     frame.pts = self.frame_index
     frame.time_base = self.codec.time_base
     if force_keyframe:

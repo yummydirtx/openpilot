@@ -306,7 +306,9 @@ class RoadRenderer:
       colors = [tuple(int((1 - blend) * first + blend * second) for first, second in zip(a, b, strict=True))
                 for a, b in zip(NO_THROTTLE_COLORS, THROTTLE_COLORS, strict=True)]
       stops = [0., 0.5, 1.]
-    if len(colors) > 1:
+    if state.display_status == "disengaged":
+      pass  # Explicit projection preference: no path while disengaged.
+    elif len(colors) > 1:
       polygons_drawn["path"] = int(self._gradient_polygon(image, polygon, colors, stops))
     else:
       polygons_drawn["path"] = int(self._polygon(image, polygon, (255, 255, 255, 30)))

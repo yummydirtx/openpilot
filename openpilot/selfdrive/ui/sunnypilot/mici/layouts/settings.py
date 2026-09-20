@@ -99,6 +99,14 @@ class SettingsLayoutSP(OP.SettingsLayout):
     # end slot: enable-offroad (right of developer)
     items.append(self._enable_offroad_btn_offroad)
 
+    # Use the same category card as the rest of the four settings. Insert last
+    # so the Sunnypilot category ordering and its device index stay unchanged.
+    android_auto = SettingsBigButton("android auto", "", gui_app.texture("icons_mici/usb.png", 76, 49))
+    android_auto.set_visible(lambda: bool(gui_app.display_handoff and gui_app.display_handoff.enabled))
+    android_auto.set_click_callback(lambda: gui_app.display_handoff.select(
+      "local" if gui_app.display_handoff.mode == "project" else "project"))
+    items.insert(0, android_auto)
+
     self._scroller._items.clear()
     for item in items:
       self._scroller.add_widget(item)

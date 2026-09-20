@@ -74,7 +74,10 @@ def claim_gadget():
 
 def project_live(session, worker, deadline, fps, status_path, display_control=None):
   from tools.android_auto.menu import ProjectionMenu
+  from tools.android_auto.frame_rate import FrameRate
   menu = ProjectionMenu()
+  cadence = FrameRate(fps)
+  native_actions = []
   start = time.monotonic()
   next_frame = start
   last_status = start - 2
@@ -95,11 +98,17 @@ def project_live(session, worker, deadline, fps, status_path, display_control=No
     if display_control is not None:
       display_control.sync(session)
     while getattr(session, "input_actions", ()):
-      command = menu.handle(session.input_actions.popleft())
+      action = session.input_actions.popleft()
+      if getattr(worker, "native", False):
+        if len(native_actions) < 32:
+          native_actions.append((action.name, action.steps))
+        continue
+      command = menu.handle(action)
       if command in ("exit", "local"):
         session.request_native(resume_from_head_unit=command == "exit")
     if not session.focused:
       menu.reset()
+      native_actions.clear()
     now = time.monotonic()
     if session.focus_epoch != focus_epoch:
       focus_epoch = session.focus_epoch
@@ -114,6 +123,12 @@ def project_live(session, worker, deadline, fps, status_path, display_control=No
       result = worker.poll(0)
       if result is not None:
         data, metadata = result
+        if getattr(worker, "native", False) and session.focused and requested_epoch == session.focus_epoch:
+          command = metadata.get("ui_command")
+          if command in ("exit", "local"):
+            session.request_native(resume_from_head_unit=command == "exit")
+          elif command == "bookmark" and display_control is not None:
+            display_control.bookmark()
         worker_cpu = metadata["cpu_seconds"]
         now = time.monotonic()
         age = now - metadata["captured_at"]
@@ -144,12 +159,14 @@ def project_live(session, worker, deadline, fps, status_path, display_control=No
     if not worker.busy and session.focused and session.unacked < session.window and now >= next_frame:
       requested_epoch = session.focus_epoch
       if getattr(session, "input_channel", None) is not None:
-        worker.request(force_keyframe=session.needs_keyframe, menu=menu.snapshot())
+        worker.request(force_keyframe=session.needs_keyframe,
+                       menu={"actions": native_actions} if getattr(worker, "native", False) else menu.snapshot())
+        native_actions = []
       else:
         worker.request(force_keyframe=session.needs_keyframe)
       requested = now
       # Never catch up overdue frames; sample current telemetry at each request.
-      next_frame = now + 1 / fps
+      next_frame = now + 1 / cadence.current
     if display_control is not None:
       display_control.publish(session, valid_until=valid_until, stale=last_metadata.get("stale", True))
     if now - last_status >= 1:
@@ -163,10 +180,14 @@ def project_live(session, worker, deadline, fps, status_path, display_control=No
       if cpu_sample is not None:
         cores = max(0, cpu - cpu_sample[1]) / (now - cpu_sample[0])
         summary["renderer_and_sender_cpu_cores"] = round(cores, 3)
+        if cadence.sample(cores):
+          session.event("frame_rate_changed", target_fps=cadence.current, measured_cpu_cores=round(cores, 3))
+          cpu_over_budget = 0
         cpu_over_budget = cpu_over_budget + 1 if cores > 0.85 else 0
         if cpu_over_budget >= 5:
           raise RuntimeError("Projection exceeded 85% of one CPU core for five samples")
       cpu_sample = (now, cpu)
+      summary["target_fps"] = cadence.current
       atomic_json(status_path, summary)
       session.event("live_status", **summary)
       last_status = now
@@ -194,7 +215,7 @@ def main():
   parser.add_argument("--height", type=int, default=720)
   parser.add_argument("--margin-height", type=int, default=240)
   parser.add_argument("--fps", type=int, choices=(8, 10, 15, 30), default=8, help="Source update rate; negotiated codec mode is 30 fps")
-  parser.add_argument("--view", choices=("road", "hud"), default="road", help="Full passive onroad view, or HUD-only fallback")
+  parser.add_argument("--view", choices=("road", "hud", "native"), default="road", help="Native 3X frontend, passive road view, or HUD fallback")
   parser.add_argument("--stock", action="store_true", help="Use stock openpilot instead of Sunnypilot state semantics")
   parser.add_argument("--once", action="store_true", help="Exit on a session failure instead of reconnecting")
   parser.add_argument("--managed", action="store_true", help="Require local-display supervisor heartbeats")
@@ -237,7 +258,8 @@ def main():
           atomic_json(args.output / "status.json", {"phase": "initializing", "attempt": attempt})
           # PNG diagnostics belong to live_preview. Compressing/writing a
           # camera snapshot must never delay the live display's first frame.
-          worker = FrameWorker(viewport, args.assets, args.hud_path, sunnypilot=not args.stock, view=args.view)
+          worker = FrameWorker(viewport, args.assets, args.hud_path, sunnypilot=not args.stock, view=args.view,
+                               startup_timeout=30 if args.view == "native" else 10)
           claim_gadget()
           claimed = True
           gadget.setup(negotiate=True)

@@ -62,6 +62,7 @@ class LiveDisplayState:
   # Alerts may remain visible when an unrelated HUD source is unavailable.
   # Keep their selfdriveState freshness separate from the aggregate HUD age.
   alert_age_seconds: float = math.inf
+  steering_angle: float = 0.0
 
   @property
   def stale(self):
@@ -214,8 +215,10 @@ class LiveStateAdapter:
     speed = set_speed = None
     status = "disengaged"
     cruise_available = True
+    steering_angle = 0.0
     if started and not missing:
       cs = sm["carState"]
+      steering_angle = finite_number(getattr(cs, "steeringAngleDeg", 0.0))
       cluster = finite_number(cs.vEgoCluster)
       self.cluster_seen = self.cluster_seen or cluster != 0.0
       velocity = cluster if self.cluster_seen and not true_speed else finite_number(cs.vEgo)
@@ -236,7 +239,7 @@ class LiveStateAdapter:
       status = "disengaged"
     return LiveDisplayState(speed=speed, set_speed=set_speed, status=status, is_metric=is_metric, started=started,
                             age_seconds=age, missing_services=tuple(missing), alert=alert, hide_speed=hide_speed,
-                            is_cruise_available=cruise_available, alert_age_seconds=alert_age)
+                            is_cruise_available=cruise_available, alert_age_seconds=alert_age, steering_angle=steering_angle)
 
 
 class LiveStateReader:

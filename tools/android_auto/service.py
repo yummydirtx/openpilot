@@ -15,7 +15,7 @@ def main():
   parser.add_argument("--duration", type=int, default=600)
   parser.add_argument("--output", default="live-run")
   parser.add_argument("--fps", type=int, choices=(8, 10, 15, 30), default=8)
-  parser.add_argument("--view", choices=("road", "hud"), default="road")
+  parser.add_argument("--view", choices=("road", "hud", "native"), default="road")
   parser.add_argument("--once", action="store_true")
   parser.add_argument("--managed", action="store_true", help="Use the installed local-display supervisor")
   args = parser.parse_args()

@@ -153,3 +153,23 @@ class TestDisplayHandoff(unittest.TestCase):
     with patch("time.monotonic", return_value=11.):
       with self.assertRaisesRegex(RuntimeError, "heartbeat"):
         controller.sync(s)
+
+  def test_heartbeat_written_during_read_is_not_rejected_as_future(self):
+    # A writer can rename its new file after the reader starts but before it
+    # samples the validation clock. All readers must clock AFTER the read.
+    clock = [10.0]
+
+    def concurrent_read(_):
+      clock[0] = 10.002
+      return {"at": 10.001, "token": self.client.token, "mode": "project",
+              "phase": "projecting", "ready": True, "ready_until": 10.3}
+
+    self.client.select("project")
+    with patch("time.monotonic", side_effect=lambda: clock[0]), \
+         patch("openpilot.system.ui.lib.display_handoff.read_json", side_effect=concurrent_read):
+      self.client.tick()
+      self.assertTrue(self.client.suppressed)
+    clock[0] = 10.0
+    with patch("time.monotonic", side_effect=lambda: clock[0]), \
+         patch("tools.android_auto.display_control.read_json", side_effect=concurrent_read):
+      DisplayControl(self.root).sync(session())

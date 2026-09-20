@@ -1,5 +1,13 @@
 # Live comma-to-Mazda road display
 
+**Native frontend update (September 19):** `--view native` now uses the installed
+3X `MainLayout`, full settings tree, and original GPU road renderer in an isolated
+EGL pbuffer. It supports Commander focus/scrolling and native widget callbacks;
+those callbacks can change settings. An isolated render/encode benchmark reached
+26.07 fps; production cadence adapts to measured CPU load. The `road`/`hud` modes
+below remain the earlier read-only CPU fallback. See [controls.md](controls.md)
+for the current implementation, installation, evidence, and remaining checks.
+
 September 19, 2026: the comma now generates, encodes, and sends a live vehicle HUD
 directly to the Mazda over USB. Alex confirmed the live `0 mph` display while
 parked. The first complete run acknowledged **1,373 of 1,373 frames**. This is a
