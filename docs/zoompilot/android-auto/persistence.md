@@ -66,3 +66,32 @@ For a source rollback, return the device to the recorded previous remote,
 branch, and updater target, then reboot normally while offroad. The hash-guarded
 UI bundle rollback is for experimental file-only installations; applying it
 over a committed installation would intentionally dirty that branch.
+
+## Verified deployment — 2026-09-19
+
+The C4 was switched from clean `develop` at `1662aceda` to committed
+`automaxxing` at `c1307ebac`. Its original remote was retained as `upstream`;
+`origin` now points to the fork above, with `UpdaterTargetBranch=automaxxing`.
+The previous configuration and installation record are saved outside the
+checkout as `/data/automaxxing/persistence-before.json` and
+`/data/automaxxing/persistence-install.json`.
+
+A normal manager-requested reboot was completed and a new boot ID verified.
+After boot, the tracked checkout was clean, the branch and update target were
+retained, submodule revisions were unchanged, and every expected manager
+process was running, including the native UI and updater.
+The updater subsequently finalized `c1307ebac` with the integration present,
+confirming its next staged boot also uses the project branch.
+
+The native handoff adapter was enabled in local mode before the temporary
+supervisor unit existed. The actual Android Auto settings card passed the
+offscreen launcher probe: ordinary short tap, starting/connecting/connected
+indicators, failed-session retry, and cancel. The launcher's fixed startup
+command successfully recreated its supervisor after reboot.
+
+A ten-second offroad full-native-UI probe then produced 285 frames at
+28.04 fps using `qcom-v4l2`, with fresh display state and no software fallback.
+This was a renderer/encoder check in the room, not another Mazda display test.
+Diagnostic results remain under `/data/automaxxing/persistence-*`.
+The final supervisor state was `local`, with USB projection inactive and all
+expected manager processes healthy.
