@@ -60,8 +60,8 @@ the indicator immediately. Focus follows the native frontend's painted category,
 toggle, and segment bounds independently of its touch rectangles. Scroll clipping
 clips the outline without shrinking or moving it onto a different control.
 
-These focus changes have local regression coverage; physical Commander/visual
-verification of the updated highlights on the Mazda is still pending.
+These focus changes have local regression coverage. Alex subsequently reported
+that the requested parked launcher/focus/local-return/relaunch sequence works well.
 `native_ui_probe` now captures category focus and its idle disappearance while
 continuing telemetry updates, without activating vehicle settings.
 
@@ -167,8 +167,8 @@ Backup: `/data/automaxxing/native-ui-backup`.
   outline fits the category background and disappears after inactivity.
   The update was installed into `/data/automaxxing/tools/android_auto`;
   the prior sources were retained in `tools-before-focus-cd1791a.tgz`. No native
-  manager restart was needed. Physical confirmation of the updated focus on
-  the Mazda remains pending.
+  manager restart was needed. Alex subsequently confirmed the updated focus on
+  the Mazda during the requested parked test sequence.
 - The complete native settings preview was visually inspected: native sidebar,
   category selection, display actions and rotary focus fit the negotiated viewport.
 - The first root-run menu probe created four unreadable parameter/cache files.
@@ -190,6 +190,31 @@ Backup: `/data/automaxxing/native-ui-backup`.
   Status-card images were visually checked, including the native font's failure
   label. Bundle `native-ui-v8` was installed and loaded with a guarded normal
   manager restart after fresh Park/disengaged checks.
+- Alex reported the updated parked end-to-end test works well: normal launcher
+  tap, category focus alignment, idle hide/wake, extended road-view display,
+  touch-to-return locally, and relaunch. This is physical UI confirmation, not
+  driving-load validation.
+- The latest captured session, `interactive-eeaeff4aee3c`, acknowledged
+  **6,018/6,018 frames**, sent **zero stale frames**, and discarded two captures.
+  Its final status was at 413.62 seconds, after returning to native display.
+  Maximum ACK latency was **23.94 ms** and maximum sent-frame age was **174.44 ms**.
+  Median sampled delivery was **14.00 fps**, p95 **18.95 fps**. Median sender plus
+  worker CPU was **0.658 cores**, with cadence alternating between 15 and 20 fps
+  after the initial 30 fps request exceeded the budget.
+- Frame-production median timings from 405 streaming status samples were:
+  UI updates **1.08 ms**, draw submission **13.84 ms**, GPU readback **6.24 ms**,
+  software H.264 encoding **24.39 ms**, and total render/encode **46.84 ms**.
+  These are separate sample medians, not an additive per-frame decomposition.
+  Encoding is the largest measured stage and the next performance target;
+  evaluate the existing native V4L2 encoder as a separate bounded projection
+  encoder before changing production defaults. A stable 30 fps remains unproven.
+- Two latest sessions (`interactive-b33550db6782`, `interactive-eeaeff4aee3c`)
+  ended with `Native UI source data is unavailable or stale` immediately after
+  renewed video focus, following several seconds on native display. The current
+  worker stops on the first stale render. The failure does not identify which
+  source failed, so the cause is unresolved; distinguish source reacquisition on
+  resume from car shutdown before declaring this edge case fixed. At inspection
+  the device had rebooted and was offroad with all expected processes running.
 - **262 local tests** pass, including launcher status and stale-failure retry,
   focus inactivity/wake, native focus geometry,
   delivered-rate reporting, heartbeat read ordering, disengaged path
@@ -199,8 +224,8 @@ Backup: `/data/automaxxing/native-ui-backup`.
   both focus transitions. The earlier Mazda control run acknowledged 249/249 frames.
 
 Alex confirmed the full native frontend looks good on the Mazda. Still needed:
-longer native-frontend AA delivery, physical Commander checks of the updated focus
-behavior, repeated handoffs, reconnects, OEM music,
+resolve/diagnose the source-data failure on renewed focus, repeated handoffs,
+reconnects, OEM music,
 and driving-load validation. The isolated benchmark does not establish on-road
 readiness. Keep the car parked for installation and these pending checks.
 
