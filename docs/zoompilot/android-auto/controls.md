@@ -6,6 +6,13 @@ It starts the supervisor if needed and requests projection. The native display
 keeps drawing until the head unit acknowledges a fresh projected frame. Touch
 input remains active while local drawing and the backlight are suppressed.
 
+The category card shows **tap to start → starting... → connecting... → connected**
+using the native subtitle and rotating-icon busy animation. A normal short tap
+updates it immediately; holding is not required. A second tap cancels startup.
+Failures leave **failed - retry** visible until the next selection, and a supervisor
+that never starts fails after ten seconds. A stale failure reply from an older
+selection can no longer cancel a new tap before the supervisor receives it.
+
 Touch the comma screen to return locally. The entire gesture is consumed,
 including all touch slots. Local selection blocks late AA focus grants until
 another explicit selection. Critical alerts, expired video freshness, and expired
@@ -176,7 +183,15 @@ Backup: `/data/automaxxing/native-ui-backup`.
   discarded, and no stale frames were sent. The receiver ended this session;
   it did not end with the earlier supervisor-heartbeat error. This is actual
   USB/receiver evidence and is distinct from the faster isolated benchmark.
-- **257 local tests** pass, including focus inactivity/wake, native focus geometry,
+- `native-launcher-v8`: isolated rendering of the actual four category card
+  verified starting/connecting/connected/failed states, a press and release with
+  no hold duration, retry against a previous failure reply, and cancellation.
+  It used private test mailboxes and did not start a projection session.
+  Status-card images were visually checked, including the native font's failure
+  label. Bundle `native-ui-v8` was installed and loaded with a guarded normal
+  manager restart after fresh Park/disengaged checks.
+- **262 local tests** pass, including launcher status and stale-failure retry,
+  focus inactivity/wake, native focus geometry,
   delivered-rate reporting, heartbeat read ordering, disengaged path
   suppression, steering rotation, GPU RGBA H.264 decoding, rotary navigation,
   bounded overload adaptation, and existing transport/install/failure regressions.

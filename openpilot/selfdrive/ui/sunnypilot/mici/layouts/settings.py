@@ -36,6 +36,31 @@ class SunnylinkBigButton(SettingsBigButton):
     return 56
 
 
+class AndroidAutoBigButton(SettingsBigButton):
+  def __init__(self):
+    super().__init__("android auto", "tap to start", gui_app.texture("icons_mici/usb.png", 76, 49))
+    self.set_visible(lambda: bool(gui_app.display_handoff and gui_app.display_handoff.enabled))
+    self.set_click_callback(self._select_display)
+
+  def _get_label_font_size(self):
+    # The two-line category title needs room for the native status subtitle.
+    return 48
+
+  def _select_display(self):
+    client = gui_app.display_handoff
+    if client is not None:
+      client.select("local" if client.mode == "project" else "project")
+      self._update_state()  # A normal tap immediately acknowledges the request.
+
+  def _update_state(self):
+    super()._update_state()
+    client = gui_app.display_handoff
+    if client is not None:
+      if self.get_value() != client.status_text:
+        self.set_value(client.status_text)
+      self.set_rotate_icon(client.connecting)
+
+
 class SettingsLayoutSP(OP.SettingsLayout):
   def __init__(self):
     OP.SettingsLayout.__init__(self)
@@ -101,11 +126,7 @@ class SettingsLayoutSP(OP.SettingsLayout):
 
     # Use the same category card as the rest of the four settings. Insert last
     # so the Sunnypilot category ordering and its device index stay unchanged.
-    android_auto = SettingsBigButton("android auto", "", gui_app.texture("icons_mici/usb.png", 76, 49))
-    android_auto.set_visible(lambda: bool(gui_app.display_handoff and gui_app.display_handoff.enabled))
-    android_auto.set_click_callback(lambda: gui_app.display_handoff.select(
-      "local" if gui_app.display_handoff.mode == "project" else "project"))
-    items.insert(0, android_auto)
+    items.insert(0, AndroidAutoBigButton())
 
     self._scroller._items.clear()
     for item in items:

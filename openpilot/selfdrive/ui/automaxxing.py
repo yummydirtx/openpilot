@@ -26,7 +26,7 @@ class NativeDisplayHandoff:
   def before_frame(self, events):
     if self._starter is not None and self._starter.poll() is not None:
       if self._starter.returncode:
-        self.client.select("local")
+        self.client.fail()
       self._starter = None
     sm = self.ui_state.sm
     critical = (sm.valid["selfdriveState"] and sm["selfdriveState"].alertStatus.raw == 2)

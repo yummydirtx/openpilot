@@ -46,6 +46,60 @@ class TestDisplayHandoff(unittest.TestCase):
     self.client.tick(now=10.1)
     self.assertTrue(self.client.suppressed)
 
+  def test_new_tap_survives_previous_sessions_failure_and_publishes_request(self):
+    old_token = self.client.token
+    write_json(self.root / "status.json", {"at": 10., "token": old_token, "phase": "failed"})
+    self.client.tick(now=10.)
+    self.client.select("project")
+    new_token = self.client.token
+    self.assertEqual(self.client.status_text, "starting...")
+    self.client.tick(now=10.1)
+    self.assertEqual(self.client.mode, "project")
+    request = read_json(self.root / "request.json")
+    self.assertEqual((request["token"], request["mode"]), (new_token, "project"))
+    self.assertFalse(self.client.failed)
+
+  def test_status_immediately_acknowledges_tap_then_tracks_current_session(self):
+    self.assertEqual(self.client.status_text, "tap to start")
+    self.client.select("project")
+    self.assertEqual(self.client.status_text, "starting...")
+    self.assertTrue(self.client.connecting)
+    self.status()
+    self.client.tick(now=10.)
+    self.assertEqual(self.client.status_text, "connecting...")
+    self.status(ready=True)
+    self.client.tick(now=10.1)
+    self.assertEqual(self.client.status_text, "connected")
+    self.assertFalse(self.client.connecting)
+    self.client.select("local")
+    self.assertEqual(self.client.status_text, "tap to start")
+
+  def test_failure_status_persists_until_explicit_retry(self):
+    self.client.select("project")
+    write_json(self.root / "status.json", {"at": 10., "token": self.client.token, "phase": "failed"})
+    self.client.tick(now=10.)
+    self.assertEqual(self.client.mode, "local")
+    self.assertEqual(self.client.status_text, "failed - retry")
+    self.assertFalse(self.client.connecting)
+    write_json(self.root / "status.json", {"at": 10.1, "token": self.client.token, "phase": "local"})
+    self.client.tick(now=10.1)
+    self.assertEqual(self.client.status_text, "failed - retry")
+    self.client.select("project")
+    self.assertEqual(self.client.status_text, "starting...")
+
+  def test_bootstrap_without_supervisor_response_has_bounded_starting_status(self):
+    with patch("time.monotonic", return_value=10.):
+      self.client.select("project")
+    self.client.tick(now=19.9)
+    self.assertEqual(self.client.status_text, "starting...")
+    self.client.tick(now=20.1)
+    self.assertEqual(self.client.status_text, "failed - retry")
+
+  def test_supervisor_launcher_failure_is_visible(self):
+    client = HandoffClient(self.root, self.root, starter=Mock(side_effect=OSError("missing")))
+    client.select("project")
+    self.assertEqual(client.status_text, "failed - retry")
+
   def test_touch_consumes_whole_gesture_and_local_choice_is_sticky(self):
     self.project()
     previous = self.client.token

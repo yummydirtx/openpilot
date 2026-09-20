@@ -60,6 +60,9 @@ class HandoffClient:
     self.suppressed = False
     self.available = False
     self.phase = "local"
+    self.failed = False
+    self._status_token = None
+    self._requested_at = None
     self._last_write = -1.0
     self._gesture_slots = set()
     self.starter = starter
@@ -72,10 +75,28 @@ class HandoffClient:
   def label(self):
     return "Cancel Android Auto" if self.mode == "project" else "Use Mazda display"
 
+  @property
+  def status_text(self):
+    if self.failed:
+      return "failed - retry"
+    if self.mode == "local":
+      return "tap to start"
+    if self.suppressed:
+      return "connected"
+    if not self.available or self._status_token != self.token:
+      return "starting..."
+    return "waiting for Mazda" if self.phase == "local" else "connecting..."
+
+  @property
+  def connecting(self):
+    return self.mode == "project" and not self.suppressed and self.status_text != "waiting for Mazda"
+
   def select(self, mode):
     if mode not in ("local", "project"):
       raise ValueError("Invalid display mode")
     self.mode = mode
+    self.failed = False
+    self._requested_at = time.monotonic() if mode == "project" else None
     self.token = uuid.uuid4().hex
     self._last_write = -1.0
     if mode == "local":
@@ -84,7 +105,11 @@ class HandoffClient:
       try:
         self.starter()
       except OSError:
-        self.mode = "local"
+        self.fail()
+
+  def fail(self):
+    self.select("local")
+    self.failed = True
 
   def tick(self, events=(), *, critical=False, now=None):
     status = read_json(self.state_dir / "status.json")
@@ -94,11 +119,14 @@ class HandoffClient:
     was_available = self.available
     self.available = fresh(status, now) and status.get("phase") in ("local", "connecting", "projecting", "failed")
     self.phase = status.get("phase", "local") if self.available else "unavailable"
+    self._status_token = status.get("token") if self.available else None
     was_suppressed = self.suppressed
     if critical and self.mode == "project":
       self.select("local")
-    if self.phase == "failed" and self.mode == "project":
-      self.select("local")
+    # A previous session's failure must not cancel the new request before the
+    # supervisor sees it. Only the current selection owns its failure reply.
+    if self.phase == "failed" and self.mode == "project" and self._status_token == self.token:
+      self.fail()
     if self.mode == "project" and self.available and status.get("token") == self.token and status.get("local_requested") is True:
       self.select("local")
     # A first touch is a display switch, never a click through to a native widget.
@@ -119,7 +147,10 @@ class HandoffClient:
                        and status.get("token") == self.token and status.get("ready") is True
                        and type(until) in (int, float) and now < until <= now + LEASE_SECONDS)
     if (was_suppressed or was_available) and not self.available:
-      self.select("local")
+      if self.mode == "project":
+        self.fail()
+    if self.mode == "project" and not self.available and self._requested_at is not None and now - self._requested_at > 10:
+      self.fail()
     if self.available and now - self._last_write >= 0.1:
       try:
         write_json(self.request_dir / "request.json", {"at": now, "token": self.token, "mode": self.mode})
@@ -127,4 +158,6 @@ class HandoffClient:
       except OSError:
         self.suppressed = False
         self.available = False
+        if self.mode == "project":
+          self.fail()
     return filtered
