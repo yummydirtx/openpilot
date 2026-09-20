@@ -19,6 +19,7 @@ def main():
   parser.add_argument("--duration", type=float, default=20)
   parser.add_argument("--fps", type=int, choices=(8, 10, 15, 30), default=8)
   parser.add_argument("--view", choices=("road", "hud", "native"), default="road")
+  parser.add_argument("--encoder", choices=("auto", "software", "hardware"), default="software")
   parser.add_argument("--output", type=Path, required=True)
   parser.add_argument("--assets", type=Path, default=Path("/data/openpilot/openpilot/selfdrive/assets"))
   parser.add_argument("--hud-path", type=Path, default=Path("native/hud_drawing.py"))
@@ -28,7 +29,8 @@ def main():
     parser.error("Preview duration must be 1–120 seconds")
   args.output.mkdir(parents=True, exist_ok=False, mode=0o700)
   worker = FrameWorker(Viewport(1280, 720, 0, 240), args.assets, args.hud_path,
-                       sunnypilot=not args.stock, output=args.output, view=args.view, startup_timeout=30 if args.view == "native" else 10)
+                       sunnypilot=not args.stock, output=args.output, view=args.view, encoder=args.encoder,
+                       startup_timeout=30 if args.view == "native" else 10)
   started = time.monotonic()
   end = started + args.duration
   next_frame = started
@@ -49,6 +51,8 @@ def main():
           continue
         data, metadata = result
         frames += 1
+        if frames == 1:
+          (args.output / "first-frame.h264").write_bytes(data)
         total_bytes += len(data)
         road = metadata.get("road") or {}
         camera_frames += bool(road.get("camera_displayed"))
@@ -64,7 +68,7 @@ def main():
     worker.close()
   elapsed = time.monotonic() - started
   cpu = None if cpu_first == cpu_last else (cpu_last[1] - cpu_first[1]) / (cpu_last[0] - cpu_first[0])
-  result = {"view": args.view, "requested_fps": args.fps, "frames": frames, "camera_frames": camera_frames,
+  result = {"view": args.view, "encoder": args.encoder, "requested_fps": args.fps, "frames": frames, "camera_frames": camera_frames,
             "model_frames": model_frames, "seconds": elapsed, "fps": frames / elapsed, "worker_cpu_cores": cpu,
             "max_capture_age_ms": max_frame_age * 1000, "max_render_encode_ms": max_render_time * 1000,
             "encoded_bytes": total_bytes, "last_display": last,

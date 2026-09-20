@@ -17,9 +17,13 @@ def run(connection, frame_buffer, config):
     from tools.android_auto.native_identity import native_identity
     native_identity(config["output"])
     from tools.android_auto.native_renderer import NativeRenderer
-    from tools.android_auto.live_encode import H264Encoder
+    from tools.android_auto.live_encode import create_native_encoder
     renderer = NativeRenderer(config["viewport"])
-    encoder = H264Encoder(config["viewport"].width, config["viewport"].height)
+    viewport = config["viewport"]
+    # Only skip known black rows with chroma-aligned margin boundaries.
+    margin = viewport.margin_height if viewport.margin_height % 4 == 0 else 0
+    encoder, encoder_fallback = create_native_encoder(viewport.width, viewport.height, config.get("encoder", "software"),
+                                                      margin_height=margin)
     end = time.monotonic() + 2
     while True:
       image = renderer.render(raw=True)
@@ -50,6 +54,9 @@ def run(connection, frame_buffer, config):
         encode_started = time.monotonic()
         data = encoder.encode_rgba(image.buffer, force_keyframe=first or command[1])
         metadata.update(renderer.frame_timing, encode_seconds=time.monotonic() - encode_started)
+        metadata.update(getattr(encoder, "timing", {}), encoder=getattr(encoder, "backend", "libx264"))
+        if encoder_fallback is not None:
+          metadata["encoder_fallback"] = encoder_fallback
         if first and config["output"]:
           output = Path(config["output"])
           output.mkdir(parents=True, exist_ok=True)

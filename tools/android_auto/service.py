@@ -16,6 +16,7 @@ def main():
   parser.add_argument("--output", default="live-run")
   parser.add_argument("--fps", type=int, choices=(8, 10, 15, 30), default=8)
   parser.add_argument("--view", choices=("road", "hud", "native"), default="road")
+  parser.add_argument("--encoder", choices=("auto", "software", "hardware"), default="auto")
   parser.add_argument("--once", action="store_true")
   parser.add_argument("--managed", action="store_true", help="Use the installed local-display supervisor")
   args = parser.parse_args()
@@ -35,7 +36,7 @@ def main():
              "--property=TimeoutStopSec=5", "--property=UMask=0077", f"--property=RuntimeMaxSec={args.duration + 20}",
              f"--property=ExecStopPost={PYTHON} -m tools.android_auto.runtime --recover",
              PYTHON, "-u", "-m", "tools.android_auto.runtime", "--duration", str(args.duration),
-             "--output", args.output, "--fps", str(args.fps), "--view", args.view]
+             "--output", args.output, "--fps", str(args.fps), "--view", args.view, "--encoder", args.encoder]
   if args.once:
     command.append("--once")
   if args.managed:

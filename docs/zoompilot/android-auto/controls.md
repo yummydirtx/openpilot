@@ -30,8 +30,9 @@ it never competes for brightness or display power. Bookmark requests go back to
 the four's existing publisher instead of opening a second publisher.
 
 The Mazda's 1280×480 usable area uses a 2880×1080 logical viewport. Camera import,
-scaling, widgets, and the output flip use the GPU. Final RGBA readback goes directly
-to the existing bounded H.264 encoder; hardware encoding is not implemented.
+scaling, widgets, and the output flip use the GPU. Final RGBA readback goes to a
+bounded hardware H.264 session, with software fallback during initialization.
+See [hardware encoding](hardware-encoding.md) for architecture and desk measurements.
 Projection hides the path while disengaged and rotates the wheel using live
 `steeringAngleDeg`. The installed 3X source normally draws a narrower disengaged
 path; hiding it is Alex's explicit projection preference.
@@ -66,14 +67,16 @@ that the requested parked launcher/focus/local-return/relaunch sequence works we
 continuing telemetry updates, without activating vehicle settings.
 
 The user confirmed that the full native frontend looks good on the Mazda. That
-confirms appearance, not a maximum achievable frame rate. The last isolated
-render/encode measurement was 26.07 fps; it excluded USB and receiver decoding.
+confirms appearance, not a maximum achievable frame rate. The latest hardware
+desk benchmark delivered 28.82 fps for the native offroad UI; it excluded USB,
+receiver decoding, and the driving workload.
 The live request ceiling remains 30 fps, with the existing adaptive CPU budget.
 Status now reports actual interval `sent_fps` and `acked_fps`, alongside
 `target_fps` and `ack_window`. Native frame metadata separates UI updates, draw
-submission, GPU readback (including GPU completion waits), and software encoding.
-ACK rate measures receiver acceptance, not physical screen refresh. Hardware
-encoding is a candidate for more headroom, but has not been integrated or timed.
+submission, GPU readback (including GPU completion waits), encoding backend, and
+hardware conversion/queue/wait stages. ACK rate measures receiver acceptance,
+not physical screen refresh. Hardware encoding is integrated and measured offroad;
+its Mazda playback and driving-load cadence still need physical verification.
 
 Projection never requests audio focus. Verify OEM music continuity physically.
 After an OEM exit, resume requires observed native focus followed by a receiver
@@ -215,7 +218,8 @@ Backup: `/data/automaxxing/native-ui-backup`.
   source failed, so the cause is unresolved; distinguish source reacquisition on
   resume from car shutdown before declaring this edge case fixed. At inspection
   the device had rebooted and was offroad with all expected processes running.
-- **262 local tests** pass, including launcher status and stale-failure retry,
+- **271 local tests** pass, including hardware framing and startup fallback,
+  launcher status and stale-failure retry,
   focus inactivity/wake, native focus geometry,
   delivered-rate reporting, heartbeat read ordering, disengaged path
   suppression, steering rotation, GPU RGBA H.264 decoding, rotary navigation,

@@ -224,6 +224,7 @@ def main():
   parser.add_argument("--margin-height", type=int, default=240)
   parser.add_argument("--fps", type=int, choices=(8, 10, 15, 30), default=8, help="Source update rate; negotiated codec mode is 30 fps")
   parser.add_argument("--view", choices=("road", "hud", "native"), default="road", help="Native 3X frontend, passive road view, or HUD fallback")
+  parser.add_argument("--encoder", choices=("auto", "software", "hardware"), default="auto")
   parser.add_argument("--stock", action="store_true", help="Use stock openpilot instead of Sunnypilot state semantics")
   parser.add_argument("--once", action="store_true", help="Exit on a session failure instead of reconnecting")
   parser.add_argument("--managed", action="store_true", help="Require local-display supervisor heartbeats")
@@ -267,7 +268,7 @@ def main():
           # PNG diagnostics belong to live_preview. Compressing/writing a
           # camera snapshot must never delay the live display's first frame.
           worker = FrameWorker(viewport, args.assets, args.hud_path, sunnypilot=not args.stock, view=args.view,
-                               startup_timeout=30 if args.view == "native" else 10)
+                               startup_timeout=30 if args.view == "native" else 10, encoder=args.encoder)
           claim_gadget()
           claimed = True
           gadget.setup(negotiate=True)

@@ -163,11 +163,13 @@ class FrameWorker:
   """
 
   def __init__(self, viewport, assets, hud_path=None, sunnypilot=True, *, fps=30, output=None, startup_timeout=10.0,
-               frame_timeout=0.5, view="road", _target=None):
+               frame_timeout=0.5, view="road", encoder="software", _target=None):
     if not 0 < startup_timeout <= 30 or not 0 < frame_timeout <= 0.5:
       raise ValueError("Use startup <=30 seconds and frame watchdog <=500 ms")
     if view not in ("road", "hud", "native"):
       raise ValueError("View must be road, hud, or native")
+    if encoder not in ("auto", "software", "hardware") or encoder == "hardware" and view != "native":
+      raise ValueError("Hardware encoding requires the native frontend")
     context = multiprocessing.get_context("spawn")
     self._frame_buffer = context.RawArray("B", MAX_FRAME_BYTES)
     self._connection, child_connection = context.Pipe(duplex=True)
@@ -177,7 +179,7 @@ class FrameWorker:
     self.native = view == "native"
     self.closed = False
     config = {"viewport": viewport, "assets": str(assets), "hud_path": None if hud_path is None else str(hud_path),
-              "sunnypilot": sunnypilot, "fps": fps, "view": view, "output": None if output is None else str(output)}
+              "sunnypilot": sunnypilot, "fps": fps, "view": view, "encoder": encoder, "output": None if output is None else str(output)}
     self._child = context.Process(target=_target or _worker_main, args=(child_connection, self._frame_buffer, config),
                                   name="automaxxing-frames", daemon=True)
     try:

@@ -9,7 +9,32 @@ from fractions import Fraction
 from tools.android_auto.video import nal_units
 
 
+def create_native_encoder(width, height, preference="auto", *, margin_height=0):
+  """Choose once at startup; never switch codecs during a live media session."""
+  if preference not in ("auto", "software", "hardware"):
+    raise ValueError("Encoder must be auto, software, or hardware")
+  fallback = None
+  if preference != "software":
+    encoder = None
+    try:
+      from tools.android_auto.hardware_encode import HardwareH264Encoder
+      encoder = HardwareH264Encoder(width, height, margin_height=margin_height)
+      # Exercise the driver and independently-decodable packet contract before
+      # declaring readiness. All frames actually sent get another forced IDR.
+      encoder.encode_rgba(bytes(width * height * 4), force_keyframe=True)
+      return encoder, None
+    except (OSError, RuntimeError, ValueError, AttributeError) as error:
+      if encoder is not None:
+        encoder.close()
+      if preference == "hardware":
+        raise
+      fallback = f"{type(error).__name__}: {str(error)[:160]}"
+  return H264Encoder(width, height), fallback
+
+
 class H264Encoder:
+  backend = "libx264"
+
   def __init__(self, width, height, fps=30, threads=1):
     if not (0 < width <= 1920 and 0 < height <= 1080) or width % 2 or height % 2:
       raise ValueError("H.264 requires even dimensions no larger than 1920x1080")
