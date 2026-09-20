@@ -7,6 +7,7 @@ power. Original widget callbacks retain their normal offroad/engagement gates.
 
 import math
 import os
+import time
 
 from tools.android_auto.native_egl import HeadlessContext
 
@@ -109,9 +110,11 @@ class NativeRenderer:
 
   def render(self, actions=(), *, raw=False):
     rl = self.rl
+    started = time.monotonic()
     self.state.update(update_display=False)
     self.input.handle(actions)
     self.input.begin()
+    draw_started = time.monotonic()
     rl.begin_texture_mode(self.texture)
     rl.clear_background(rl.BLACK)
     rl.rl_push_matrix()
@@ -131,7 +134,11 @@ class NativeRenderer:
     rl.draw_texture_pro(self.texture.texture, rl.Rectangle(0, 0, w, h), rl.Rectangle(ox, oy, w, h),
                         rl.Vector2(0, 0), 0, rl.WHITE)
     rl.end_texture_mode()
+    readback_started = time.monotonic()
     frame = NativeFrame(rl, rl.load_image_from_texture(self.output.texture))
+    self.frame_timing = {"ui_update_seconds": draw_started - started,
+                         "ui_draw_seconds": readback_started - draw_started,
+                         "gpu_readback_seconds": time.monotonic() - readback_started}
     self.app._frame += 1
     if raw:
       return frame

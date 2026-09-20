@@ -47,7 +47,9 @@ def run(connection, frame_buffer, config):
         metadata = renderer.metadata(captured_at)
         if metadata["stale"]:
           raise TimeoutError("Native UI source data is unavailable or stale")
+        encode_started = time.monotonic()
         data = encoder.encode_rgba(image.buffer, force_keyframe=first or command[1])
+        metadata.update(renderer.frame_timing, encode_seconds=time.monotonic() - encode_started)
         if first and config["output"]:
           output = Path(config["output"])
           output.mkdir(parents=True, exist_ok=True)

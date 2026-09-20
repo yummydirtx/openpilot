@@ -81,6 +81,7 @@ def project_live(session, worker, deadline, fps, status_path, display_control=No
   start = time.monotonic()
   next_frame = start
   last_status = start - 2
+  delivery_sample = (start, session.frames_sent, session.acked)
   requested = None
   requested_epoch = 0
   max_age = 0
@@ -170,11 +171,18 @@ def project_live(session, worker, deadline, fps, status_path, display_control=No
     if display_control is not None:
       display_control.publish(session, valid_until=valid_until, stale=last_metadata.get("stale", True))
     if now - last_status >= 1:
+      sample_seconds = now - delivery_sample[0]
       summary = {"phase": "streaming" if session.focused else "native_display", "frames_sent": session.frames_sent,
                  "frames_acked": session.acked, "max_pending": session.max_pending,
                  "max_ack_ms": round(session.max_ack_seconds * 1000, 2), "max_frame_age_ms": round(max_age * 1000, 2),
                  "dropped_frames": dropped, "live_frames": live_frames, "stale_frames": stale_frames,
                  "elapsed_seconds": round(now - start, 2), "display": last_metadata, "head_unit_verified": True}
+      # Actual deliveries during this interval, distinct from the requested
+      # cadence. ACKs measure receiver acceptance, not physical panel refresh.
+      summary["sent_fps"] = round((session.frames_sent - delivery_sample[1]) / sample_seconds, 2) if sample_seconds > 0 else 0.
+      summary["acked_fps"] = round((session.acked - delivery_sample[2]) / sample_seconds, 2) if sample_seconds > 0 else 0.
+      summary["ack_window"] = session.window
+      delivery_sample = (now, session.frames_sent, session.acked)
       summary["worker_pid"] = worker.pid
       cpu = time.process_time() + worker_cpu
       if cpu_sample is not None:

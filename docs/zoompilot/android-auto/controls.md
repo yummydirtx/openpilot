@@ -34,7 +34,7 @@ path; hiding it is Alex's explicit projection preference.
 | Click/rotate on road view | Open the full native settings interface |
 | Rotate / Up / Down | Move focus; scroll offscreen categories and items into view |
 | Left / Right | Move focus between columns |
-| Click | Run the selected native widget's original action |
+| Click | Reveal hidden focus; otherwise run the selected native widget's original action |
 | Back | Close a dialog, return from settings to road, then yield to Mazda Connect |
 | Home | Return to the native road/home view |
 | Music / Navigation | Yield video focus to OEM; opening a particular OEM app is not implemented |
@@ -45,6 +45,28 @@ offroad and engagement conditions. They can change parameters when the user
 selects a setting. Rotary activation is confined to the selected projected widget;
 no physical touchscreen input is injected. The old read-only compositor remains
 available as `--view road` or `--view hud`.
+
+Focus remains fully visible for three seconds after Commander input, fades over
+250 ms, then stays hidden until the next input. Selection is remembered. The first
+click after idle only reveals it; rotation both reveals and moves it. Home hides
+the indicator immediately. Focus follows the native frontend's painted category,
+toggle, and segment bounds independently of its touch rectangles. Scroll clipping
+clips the outline without shrinking or moving it onto a different control.
+
+These focus changes have local regression coverage; installation and visual
+verification on the Mazda are pending because SSH is currently unreachable.
+`native_ui_probe` now captures category focus and its idle disappearance while
+continuing telemetry updates, without activating vehicle settings.
+
+The user confirmed that the full native frontend looks good on the Mazda. That
+confirms appearance, not a maximum achievable frame rate. The last isolated
+render/encode measurement was 26.07 fps; it excluded USB and receiver decoding.
+The live request ceiling remains 30 fps, with the existing adaptive CPU budget.
+Status now reports actual interval `sent_fps` and `acked_fps`, alongside
+`target_fps` and `ack_window`. Native frame metadata separates UI updates, draw
+submission, GPU readback (including GPU completion waits), and software encoding.
+ACK rate measures receiver acceptance, not physical screen refresh. Hardware
+encoding is a candidate for more headroom, but has not been integrated or timed.
 
 Projection never requests audio focus. Verify OEM music continuity physically.
 After an OEM exit, resume requires observed native focus followed by a receiver

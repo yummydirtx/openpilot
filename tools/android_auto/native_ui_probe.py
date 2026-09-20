@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import time
 
+from tools.android_auto.native_input import FOCUS_IDLE_SECONDS, FOCUS_FADE_SECONDS
+
 
 def main():
   parser = argparse.ArgumentParser(description=__doc__)
@@ -31,6 +33,20 @@ def main():
     settings = renderer.main._layouts[MainState.SETTINGS]
     assert settings._current_panel == 99
     image.save(args.output / "android-auto-settings.png")
+    renderer.render([("rotate", 1)])  # Close button -> first (Android Auto) category.
+    target = next(t for t in renderer.input.previous if t.key == renderer.input.selected)
+    assert getattr(target.widget, "panel_type", None) == 99
+    renderer.render().save(args.output / "category-focus.png")
+    selection = renderer.input.selected
+    # Continue updating telemetry while the real inactivity timer expires.
+    end = time.monotonic() + FOCUS_IDLE_SECONDS + FOCUS_FADE_SECONDS + .1
+    while time.monotonic() < end:
+      renderer.render()
+      time.sleep(.03)
+    assert renderer.input.focus_alpha() == 0 and renderer.input.selected == selection
+    renderer.render().save(args.output / "focus-hidden.png")
+    renderer.render([("select", 1)])  # Wake focus, do not activate anything.
+    assert renderer.input.focus_alpha() > 0
     # Exercise every original settings category, including those that require
     # scrolling. Activate ONLY category navigation, never a parameter/button.
     for panel in settings._panels:
@@ -51,7 +67,8 @@ def main():
     assert renderer.main._current_mode == MainState.ONROAD
     renderer.render([("back", 1)])
     assert renderer.command == "exit"
-    (args.output / "result.json").write_text(json.dumps({"visited_categories": visited, "back_to_road": True, "back_to_oem": True}, indent=2))
+    (args.output / "result.json").write_text(json.dumps({"visited_categories": visited, "back_to_road": True, "back_to_oem": True,
+                                                       "focus_idle_hide": True, "focus_wake": True}, indent=2))
   finally:
     renderer.close()
 

@@ -275,8 +275,9 @@ class TestLiveProjectionLoop(unittest.TestCase):
 
     worker.request, worker.poll = request, poll
     with patch.object(runtime.time, "monotonic", side_effect=lambda: clock[0]), \
-         patch.object(runtime.time, "process_time", return_value=0), patch.object(runtime, "atomic_json"):
+         patch.object(runtime.time, "process_time", return_value=0), patch.object(runtime, "atomic_json") as status:
       result = runtime.project_live(target, worker, seconds, 30, Path("unused-status.json"))
+    self.status_samples = [call.args[1] for call in status.call_args_list]
     return result, requests, target
 
   def test_source_plus_encoding_age_drops_frame_then_requests_keyframe(self):
@@ -285,6 +286,19 @@ class TestLiveProjectionLoop(unittest.TestCase):
     self.assertGreater(result["live_frames"], 0)
     self.assertEqual(requests[:2], [True, True])
     self.assertLessEqual(target.max_pending, 2)
+
+  def test_status_reports_delivered_rate_separately_from_requested_rate(self):
+    self.run_loop(seconds=2.2, step=.04)
+    status = self.status_samples[-1]
+    self.assertEqual(status["target_fps"], 30)
+    self.assertEqual(status["sent_fps"], 25)
+    self.assertEqual(status["acked_fps"], 25)
+    self.assertEqual(status["ack_window"], 2)
+
+  def test_native_display_has_no_delivery_rate(self):
+    self.run_loop(focused=False, seconds=2.2, step=.04)
+    self.assertEqual(self.status_samples[-1]["sent_fps"], 0)
+    self.assertEqual(self.status_samples[-1]["acked_fps"], 0)
 
   def test_focus_epoch_change_discards_in_progress_frame(self):
     def change(target, count):
