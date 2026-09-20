@@ -54,3 +54,20 @@ camera preview on an offroad C4 using private handoff mailboxes. It checks live
 camera/monitoring, reset, lease expiry, Back, Home, OEM exit, inactivity, and
 callback cleanup. Its images remain private device diagnostics. The local
 regression suite additionally covers the parked-access gates and lease owner.
+
+## Device verification — 2026-09-20
+
+A normal offroad reboot loaded `c3387288f` from the persistent `automaxxing`
+branch. The C4 probe opened the actual Device-menu action with a Commander
+click and rendered fresh cabin-camera and monitoring data (58 ms source age
+at capture). Core 7 was online while previewing. Reset, lease expiry, Back,
+Home, Music/OEM exit, the five-minute inactivity deadline, and callback cleanup
+all passed. The camera-enable flag was clear afterward; camera and monitoring
+processes stopped normally, and the native UI and all expected manager processes
+remained healthy. Local regression checks passed: 291 tests and Ruff.
+
+This verification used the C4 with ignition off and an isolated projection
+renderer; its landscape layout was visually checked. The ignition-on Park gate
+is covered by tests; the new preview still needs a
+physical Mazda display/Commander check in Park. Private diagnostic images and
+results are under `/data/automaxxing/driver-preview-probe-v5`, outside Git.

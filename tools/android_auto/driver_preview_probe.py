@@ -32,8 +32,9 @@ def main():
 
   params = Params()
   sm = messaging.SubMaster(["deviceState", "pandaStates"])
-  for _ in range(4):
-    sm.update(1000)
+  end = time.monotonic() + 3
+  while time.monotonic() < end:
+    sm.update(100)
   if not preview_offroad(sm, time.monotonic()):
     raise RuntimeError("Probe requires fresh offroad state")
   if params.get_bool("IsDriverViewEnabled"):

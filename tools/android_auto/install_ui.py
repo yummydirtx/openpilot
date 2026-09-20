@@ -1,7 +1,7 @@
 """Explicit, hash-guarded install/rollback of the native four display adapter.
 
-Bundle on the development machine; install on the parked comma. Never restart
-manager or driving processes. A separately verified UI restart loads the patch.
+Bundle on the development machine; install on the parked comma. Installation
+does not restart processes. Reboot normally while offroad to load all changes.
 """
 
 import argparse
