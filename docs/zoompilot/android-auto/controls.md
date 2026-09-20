@@ -53,8 +53,8 @@ the indicator immediately. Focus follows the native frontend's painted category,
 toggle, and segment bounds independently of its touch rectangles. Scroll clipping
 clips the outline without shrinking or moving it onto a different control.
 
-These focus changes have local regression coverage; installation and visual
-verification on the Mazda are pending because SSH is currently unreachable.
+These focus changes have local regression coverage; physical Commander/visual
+verification of the updated highlights on the Mazda is still pending.
 `native_ui_probe` now captures category focus and its idle disappearance while
 continuing telemetry updates, without activating vehicle settings.
 
@@ -154,6 +154,14 @@ Backup: `/data/automaxxing/native-ui-backup`.
   PNG accounts for a 388 ms maximum; live sessions do not write screenshots.
 - `native-menu-01`: rotary navigation reached all **16 categories**, including
   offscreen entries; Back to road and Back to OEM passed. No setting was changed.
+- `native-focus-cd1791a`: the updated on-device probe again reached all **16
+  categories**, verified inactivity hide and click-to-wake, and passed Back to
+  road/OEM. Captured category-focus and idle images were visually checked: the
+  outline fits the category background and disappears after inactivity.
+  The update was installed into `/data/automaxxing/tools/android_auto`;
+  the prior sources were retained in `tools-before-focus-cd1791a.tgz`. No native
+  manager restart was needed. Physical confirmation of the updated focus on
+  the Mazda remains pending.
 - The complete native settings preview was visually inspected: native sidebar,
   category selection, display actions and rotary focus fit the negotiated viewport.
 - The first root-run menu probe created four unreadable parameter/cache files.
@@ -161,14 +169,23 @@ Backup: `/data/automaxxing/native-ui-backup`.
   now drop privileges before UI imports, and the renderer refuses root execution.
   After recovery/reload, manager, UI, device, car and selfdrive topics were all
   seen and alive; Park/0 mph/disengaged were confirmed with no missing expected process.
-- **246 local tests** pass, including heartbeat read ordering, disengaged path
+- `interactive-cc18b1c70243`: **2,443/2,443 frames acknowledged**, with the final
+  one-second status at 166.69 seconds. Median delivery across streaming intervals
+  was **14 fps** (range approximately 8.9–22); cadence adapted 30 → 20 → 10 → 15
+  → 20. Maximum acknowledgement latency was **14.59 ms**, two captures were
+  discarded, and no stale frames were sent. The receiver ended this session;
+  it did not end with the earlier supervisor-heartbeat error. This is actual
+  USB/receiver evidence and is distinct from the faster isolated benchmark.
+- **257 local tests** pass, including focus inactivity/wake, native focus geometry,
+  delivered-rate reporting, heartbeat read ordering, disengaged path
   suppression, steering rotation, GPU RGBA H.264 decoding, rotary navigation,
   bounded overload adaptation, and existing transport/install/failure regressions.
 - Earlier DHU 2.1 checks decoded all eleven physical input commands and passed
   both focus transitions. The earlier Mazda control run acknowledged 249/249 frames.
 
-Still needed: longer native-frontend AA delivery, visual confirmation on the Mazda,
-physical Commander checks in the new menus, repeated handoffs, reconnects, OEM music,
+Alex confirmed the full native frontend looks good on the Mazda. Still needed:
+longer native-frontend AA delivery, physical Commander checks of the updated focus
+behavior, repeated handoffs, reconnects, OEM music,
 and driving-load validation. The isolated benchmark does not establish on-road
 readiness. Keep the car parked for installation and these pending checks.
 
