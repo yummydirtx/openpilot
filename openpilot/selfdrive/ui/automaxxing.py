@@ -4,7 +4,8 @@ import time
 import subprocess
 from pathlib import Path
 
-from openpilot.system.ui.lib.display_handoff import HandoffClient, STATE_DIR, read_json, fresh
+from openpilot.system.ui.lib.display_handoff import HandoffClient, STATE_DIR, REQUEST_DIR, read_json, fresh
+from openpilot.system.ui.lib.driver_preview import DriverPreviewHost, preview_sound_publisher, preview_offroad, service_fresh
 
 
 class NativeDisplayHandoff:
@@ -14,6 +15,7 @@ class NativeDisplayHandoff:
     self._last_action = None
     enabled = Path("/data/automaxxing/native-ui-enabled").is_file()
     self.client = HandoffClient(starter=self.start_supervisor if enabled else None)
+    self.driver_preview = DriverPreviewHost(ui_state.params, preview_sound_publisher)
     app.display_handoff = self.client
     app.input_filter = self.before_frame
 
@@ -36,6 +38,12 @@ class NativeDisplayHandoff:
                    or time.monotonic() - sm.recv_time["selfdriveState"] > 0.5)
     was_suppressed = self.client.suppressed
     events = self.client.tick(events, critical=critical)
+    now = time.monotonic()
+    offroad = preview_offroad(sm, now)
+    dm_fresh = service_fresh(sm, "driverMonitoringState", now, .35)
+    self.driver_preview.update(read_json(REQUEST_DIR / "driver-preview.json"), token=self.client.token,
+                               offroad=offroad, projecting=self.client.mode == "project" and self.client.suppressed,
+                               now=now, dm_state=sm["driverMonitoringState"] if dm_fresh else None)
     action = read_json(STATE_DIR / "action.json")
     if (self.client.mode == "project" and action.get("token") == self.client.token
         and fresh(action, time.monotonic()) and action.get("id") != self._last_action and action.get("action") == "bookmark"):

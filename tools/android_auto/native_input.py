@@ -105,6 +105,7 @@ class NativeInput:
     return True
 
   def register(self, widget):
+    from tools.android_auto.driver_preview import DriverPreview
     from openpilot.system.ui.widgets.list_view import ListItem, MultipleButtonAction, BUTTON_HEIGHT, RIGHT_ITEM_PADDING
     from openpilot.selfdrive.ui.layouts.settings.settings import SettingsLayout
     from openpilot.selfdrive.ui.layouts.sidebar import Sidebar, SETTINGS_BTN, HOME_BTN
@@ -119,7 +120,7 @@ class NativeInput:
     elif isinstance(widget, Sidebar):
       self.add(widget, SETTINGS_BTN, "settings", widget._on_settings_click)
       self.add(widget, HOME_BTN, "bookmark", widget._on_flag_click)
-    elif isinstance(widget, AugmentedRoadView):
+    elif isinstance(widget, (AugmentedRoadView, DriverPreview)):
       return
     elif isinstance(widget, ListItem):
       if widget.description:

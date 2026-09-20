@@ -46,6 +46,7 @@ class NativeRenderer:
     self.state.update_params()
     self.main = MainLayout(bookmark_callback=lambda: self.request_command("bookmark"))
     self._add_display_panel()
+    self._add_driver_preview()
     self.road = self.main._layouts[MainState.ONROAD]
     self.texture = rl.load_render_texture(viewport.width - viewport.margin_width, viewport.height - viewport.margin_height)
     self.output = rl.load_render_texture(viewport.width, viewport.height)
@@ -80,6 +81,23 @@ class NativeRenderer:
 
     wheel._render = rotating_wheel
 
+  def _add_driver_preview(self):
+    from openpilot.selfdrive.ui.layouts.main import MainState
+    from openpilot.selfdrive.ui.layouts.settings.device import DeviceLayout
+    from tools.android_auto.driver_preview import DriverPreview
+    from openpilot.system.ui.lib.driver_preview import DriverPreviewRequest, preview_allowed
+    self.driver_preview_request = DriverPreviewRequest()
+    settings = self.main._layouts[MainState.SETTINGS]
+    for panel in settings._panels.values():
+      if isinstance(panel.instance, DeviceLayout):
+        panel.instance.driver_camera_factory = lambda: DriverPreview(self.driver_preview_request)
+        panel.instance.driver_camera_allowed = lambda: preview_allowed(self.state.sm)
+        panel.instance._driver_camera_btn.set_description("Preview driver monitoring while the vehicle is off or in Park and disengaged.")
+
+  def _driver_preview(self):
+    from tools.android_auto.driver_preview import DriverPreview
+    return next((w for w in self.app._nav_stack if isinstance(w, DriverPreview)), None)
+
   def _add_display_panel(self):
     from openpilot.selfdrive.ui.layouts.main import MainState
     from openpilot.selfdrive.ui.layouts.settings.settings import PanelInfo
@@ -112,6 +130,12 @@ class NativeRenderer:
     rl = self.rl
     started = time.monotonic()
     self.state.update(update_display=False)
+    preview = self._driver_preview()
+    if preview is not None:
+      if any(name in ("music", "navigation") for name, _ in actions):
+        preview.dismiss()
+      else:
+        preview.tick(actions)
     self.input.handle(actions)
     self.input.begin()
     draw_started = time.monotonic()
@@ -165,11 +189,20 @@ class NativeRenderer:
       else:
         ages.append(max(0., captured_at - self.road.client.timestamp_eof / 1e9))
     age = max(ages, default=0.)
+    preview = self._driver_preview()
+    if preview is not None:
+      age = max(age, preview.display_age)
     return {"captured_at": captured_at, "stale": bool(missing) or age > .35,
             "status": self.state.status.value, "source_age_seconds": age, "display_source_age_seconds": age,
-            "missing_services": missing, "native_ui": True, "ui_command": self.command}
+            "missing_services": missing, "native_ui": True, "ui_command": self.command,
+            "driver_preview": preview is not None,
+            "cabin_camera_displayed": preview is not None and preview.camera_displayed,
+            "driver_monitoring_displayed": preview is not None and preview.monitoring_displayed}
 
   def close(self):
+    preview = self._driver_preview()
+    if preview is not None:
+      preview.close()
     self.input.close()
     self.road.close()
     self.rl.unload_render_texture(self.texture)

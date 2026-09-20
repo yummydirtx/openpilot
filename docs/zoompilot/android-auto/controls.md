@@ -20,6 +20,10 @@ supervisor heartbeats restore the local screen. State updates keep running.
 
 ## Native 3X frontend
 
+The projected Device menu includes a [C4-style driver camera preview](driver-preview.md),
+adapted to landscape with face/eye/awareness feedback and Commander controls.
+It can open offroad or while verified stopped in Park and disengaged.
+
 For an installation that survives reboots and updates, run the committed
 `automaxxing` branch from [Alex's fork](https://github.com/yummydirtx/openpilot/tree/automaxxing).
 See [persistent deployment](persistence.md). Copying the UI bundle over upstream
