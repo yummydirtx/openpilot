@@ -20,6 +20,12 @@ supervisor heartbeats restore the local screen. State updates keep running.
 
 ## Native 3X frontend
 
+For an installation that survives reboots and updates, run the committed
+`automaxxing` branch from [Alex's fork](https://github.com/yummydirtx/openpilot/tree/automaxxing).
+See [persistent deployment](persistence.md). Copying the UI bundle over upstream
+`develop` is suitable for experiments only: the updater can replace those files
+with a clean upstream checkout at reboot.
+
 `--view native` renders the installed `MainLayout`, its original road view,
 sidebar, settings panels, dialogs, and keyboard. It uses a separate EGL pbuffer
 on the Adreno render node, without opening a window or acquiring DRM master.
@@ -126,7 +132,10 @@ CAN code, driving parameters, or sudo policy.
 
 AGNOS `/etc` is read-only. `automaxxing-display.service` lives in
 `/run/systemd/system` and is recreated by the button's fixed launcher after
-reboot. Projection never starts at boot. The existing bounded worker remains
+reboot, provided the active checkout still contains the committed UI adapter.
+The enable marker and runtime under `/data/automaxxing` are persistent; the
+service's absence immediately after boot is expected and does not hide the
+button. Projection never starts at boot. The existing bounded worker remains
 `automaxxing.service`. The launcher uses the device's existing passwordless sudo.
 Diagnostic supervisor start:
 

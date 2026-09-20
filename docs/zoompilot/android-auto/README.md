@@ -1,12 +1,11 @@
 # Direct Android Auto projection
 
-Status: the direct comma four → Mazda connection works and Alex has tested it.
-The new `native` backend ports the installed 3X frontend, including all settings
-categories, onto an offscreen Adreno surface. Its isolated render/encode benchmark
-reached 26.07 fps, compared with the previous 8 fps CPU compositor. The settings
-launcher, disengaged path, steering icon, and heartbeat race are addressed in this
-revision. Long-session and driving-load validation remain open. See
-[controls and evidence](controls.md).
+Status: the direct comma four → Mazda connection works and Alex has tested the
+native 3X frontend, Commander navigation, and local display switching. Hardware
+encoding is installed; its full offroad UI benchmark reached 28.82 fps versus
+17.90 fps with software encoding. Hardware playback in the Mazda, focus-resume
+recovery, and driving-load validation remain open. See [controls and evidence](controls.md),
+[hardware measurements](hardware-encoding.md), and [persistent deployment](persistence.md).
 
 ## Objective
 
@@ -44,6 +43,10 @@ head unit's own firmware report are recorded in the [in-car runbook](in-car.md).
   freshness and failure behavior, measured load, and remaining validation.
 - [Controls and display handoff](controls.md): Commander menu, OEM exit, local
   four button, tap-to-return, backed-up native installation, and pending checks.
+- [Hardware encoding](hardware-encoding.md): dedicated V4L2 encoder, conversion,
+  fallback behavior, and measured desk performance.
+- [Persistent deployment](persistence.md): committed fork/branch deployment,
+  updater configuration, and reboot checks.
 
 This brief owns the objective and scope. The implementation plan owns progress;
 the runbook owns experimental evidence. Label new statements as observed,
@@ -95,8 +98,8 @@ with path/lanes/edges/leads, passive driver graphics, HUD, and text alerts. Keep
 HUD-only fallback while measuring load and evaluating further rendering performance.
 Commander menu navigation and a local button to start/switch displays are now
 implemented; see the controls runbook for evidence and pending physical checks.
-Further work includes native GPU rendering, hardware encoding, and driving-load
-validation.
+Native GPU rendering and hardware encoding are implemented. Remaining work
+includes hardware playback in the Mazda, lifecycle recovery, and driving-load validation.
 
 Deferred: remote start, door locks, HVAC control, wireless Android Auto, phone
 proxying, general Android apps, media/navigation integration, and replacing the
