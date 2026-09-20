@@ -10,13 +10,26 @@ import time
 from openpilot.system.ui.lib.display_handoff import STATE_DIR, REQUEST_DIR, fresh, read_json, write_json
 
 
-def service_fresh(sm, name, now, ttl):
-  return (sm.alive[name] and sm.valid[name] and 0 <= now - sm.recv_time[name] < ttl
+def service_fresh(sm, name, now, ttl, *, require_valid=True):
+  return (sm.alive[name] and (sm.valid[name] or not require_valid) and 0 <= now - sm.recv_time[name] < ttl
           and 0 <= now - sm.logMonoTime[name] / 1e9 < ttl)
 
 
 def preview_offroad(sm, now):
-  return service_fresh(sm, "deviceState", now, 1.5) and not sm["deviceState"].started
+  # IsDriverViewEnabled itself blocks deviceState.started. Watch raw ignition
+  # too, so demo ownership cannot hold the system offroad after key-on.
+  return (service_fresh(sm, "deviceState", now, 1.5) and not sm["deviceState"].started
+          and service_fresh(sm, "pandaStates", now, 1.5)
+          and not any(p.ignitionLine or p.ignitionCan for p in sm["pandaStates"]))
+
+
+def monitoring_fresh(sm, now, *, demo=False):
+  # dmonitoringd runs its demo policy offroad, but its envelope still reflects
+  # all_checks() of absent driving services. Require fresh valid model output
+  # and a fresh policy packet; relax only that envelope while in offroad demo.
+  offroad_demo = demo and preview_offroad(sm, now)
+  return (service_fresh(sm, "driverStateV2", now, .35)
+          and service_fresh(sm, "driverMonitoringState", now, .35, require_valid=not offroad_demo))
 
 
 def preview_allowed(sm, now=None):
@@ -24,7 +37,7 @@ def preview_allowed(sm, now=None):
   if not service_fresh(sm, "deviceState", now, 1.5):
     return False
   if not sm["deviceState"].started:
-    return True
+    return preview_offroad(sm, now)
   if not all(service_fresh(sm, name, now, .5) for name in ("carState", "selfdriveState", "carControl")):
     return False
   cs, controls = sm["carState"], sm["carControl"]

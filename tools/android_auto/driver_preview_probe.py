@@ -23,7 +23,7 @@ def main():
   os.environ["BIG"] = os.environ["SUNNYPILOT_UI"] = "1"
   from openpilot.cereal import messaging
   from openpilot.common.params import Params
-  from openpilot.system.ui.lib.driver_preview import DriverPreviewHost, DriverPreviewRequest, preview_sound_publisher
+  from openpilot.system.ui.lib.driver_preview import DriverPreviewHost, DriverPreviewRequest, preview_sound_publisher, monitoring_fresh, preview_offroad
   from openpilot.system.ui.lib.display_handoff import read_json, write_json
   from tools.android_auto.native_renderer import NativeRenderer
   from tools.android_auto.viewport import Viewport
@@ -31,10 +31,10 @@ def main():
   from openpilot.selfdrive.ui.layouts.settings.device import DeviceLayout
 
   params = Params()
-  sm = messaging.SubMaster(["deviceState"])
+  sm = messaging.SubMaster(["deviceState", "pandaStates"])
   for _ in range(4):
     sm.update(1000)
-  if not sm.alive["deviceState"] or not sm.valid["deviceState"] or sm["deviceState"].started:
+  if not preview_offroad(sm, time.monotonic()):
     raise RuntimeError("Probe requires fresh offroad state")
   if params.get_bool("IsDriverViewEnabled"):
     raise RuntimeError("Close the existing driver preview before probing")
@@ -53,9 +53,8 @@ def main():
         image = renderer.render(actions)
         state = renderer.state.sm
         now = time.monotonic()
-        offroad = (state.alive["deviceState"] and state.valid["deviceState"] and not state["deviceState"].started
-                   and now - state.recv_time["deviceState"] < 1.5)
-        dm_fresh = state.alive["driverMonitoringState"] and state.valid["driverMonitoringState"]
+        offroad = preview_offroad(state, now)
+        dm_fresh = monitoring_fresh(state, now, demo=host.owner is not None)
         host.update(read_json(root / "driver-preview.json"), token=token, offroad=offroad, projecting=True,
                     now=now, dm_state=state["driverMonitoringState"] if dm_fresh else None)
         if not offroad:
@@ -69,8 +68,14 @@ def main():
       panel_type, panel = next((key, info.instance) for key, info in settings._panels.items() if isinstance(info.instance, DeviceLayout))
       renderer.main.open_settings(panel_type)
       frame()
-      button = panel._quiet_mode_and_dcam.action_item.right_button
-      target = next(t for t in renderer.input.previous if t.widget is button)
+      button = panel._driver_camera_btn.action_item._button
+      target = next((t for t in renderer.input.previous if t.widget is button), None)
+      if target is None:
+        raise RuntimeError(f"Preview target absent: mode={renderer.main._current_mode}, stack=" +
+                           f"{[type(w).__name__ for w in renderer.app._nav_stack]}, panel_enabled={panel.enabled}, " +
+                           f"button_enabled={button.enabled}, allowed={panel.driver_camera_allowed()}, " +
+                           f"button_rect={(button.rect.x, button.rect.y, button.rect.width, button.rect.height)}, " +
+                           f"targets={[type(t.widget).__name__ for t in renderer.input.previous]}")
       renderer.input.reveal(target)
       for _ in range(20):
         frame()
@@ -89,11 +94,23 @@ def main():
         if preview.camera_displayed and preview.monitoring_displayed:
           image.save(args.output / "preview.png")
           result["live_camera_and_monitoring"] = True
+          result["online_cpus_during_preview"] = Path("/sys/devices/system/cpu/online").read_text().strip()
           result["metadata"] = renderer.metadata(time.monotonic())
           break
         time.sleep(.04)
       else:
-        raise RuntimeError("Cabin camera and monitoring did not become fresh within 30 seconds")
+        state = renderer.state.sm
+        now = time.monotonic()
+        details = {"enabled": params.get_bool("IsDriverViewEnabled"), "lease_owned": host.owner is not None,
+                   "preview_active": preview.active, "camera_frame": preview._camera_view.frame is not None,
+                   "camera_age": now - preview._camera_view.client.timestamp_eof / 1e9,
+                   "request": read_json(root / "driver-preview.json").get("active"),
+                   "services": {name: {"alive": state.alive[name], "valid": state.valid[name],
+                                       "recv_age": now - state.recv_time[name], "source_age": now - state.logMonoTime[name] / 1e9}
+                                for name in ("deviceState", "driverStateV2", "driverMonitoringState")},
+                   "processes": {p.name: p.running for p in state["managerState"].processes
+                                 if p.name in ("camerad", "dmonitoringmodeld", "dmonitoringd", "selfdrived")}}
+        raise RuntimeError("Preview sources unavailable: " + json.dumps(details))
 
       target = next(t for t in renderer.input.previous if t.widget is preview._reset)
       renderer.input.selected = target.key

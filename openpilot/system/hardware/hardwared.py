@@ -29,6 +29,7 @@ from openpilot.sunnypilot.system.statsd import statlog
 from openpilot.system.hardware.power_monitoring import PowerMonitoring
 from openpilot.sunnypilot.system.hardware.hardwared_ext import HardwaredExt
 from openpilot.system.hardware.fan_controller import FanController
+from openpilot.system.hardware.driver_view import should_power_save
 from openpilot.system.hardware.chestnut.status import ChestnutStatus
 from openpilot.common.version import terms_version, training_version, get_build_metadata, terms_version_sp
 
@@ -406,7 +407,8 @@ def hardware_thread(end_event, hw_queue) -> None:
       except Exception:
         pass
 
-    should_pwrsave = not onroad_conditions["ignition"] and msg.deviceState.screenBrightnessPercent < 1e-3
+    should_pwrsave = should_power_save(onroad_conditions["ignition"], msg.deviceState.screenBrightnessPercent,
+                                      not startup_conditions["not_driver_view"])
     if should_pwrsave != pwrsave or (count == 0):
       HARDWARE.set_power_save(should_pwrsave)
     pwrsave = should_pwrsave

@@ -93,6 +93,15 @@ class NativeRenderer:
         panel.instance.driver_camera_factory = lambda: DriverPreview(self.driver_preview_request)
         panel.instance.driver_camera_allowed = lambda: preview_allowed(self.state.sm)
         panel.instance._driver_camera_btn.set_description("Preview driver monitoring while the vehicle is off or in Park and disengaged.")
+        # Promote the native 3X preview row so the Commander can reach it
+        # immediately; the old SP paired button lived below the scroll viewport.
+        items = panel.instance._scroller._items
+        button = panel.instance._driver_camera_btn
+        if button in items:
+          items.remove(button)
+        items.insert(0, button)
+        if hasattr(panel.instance, "_quiet_mode_and_dcam"):
+          panel.instance._quiet_mode_and_dcam.action_item.right_button.set_visible(False)
 
   def _driver_preview(self):
     from tools.android_auto.driver_preview import DriverPreview

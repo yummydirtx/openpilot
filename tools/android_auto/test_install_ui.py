@@ -57,6 +57,15 @@ class TestNativeInstall(unittest.TestCase):
     self.assertEqual(target.read_text(), "user_edit = True\n")
     self.assertFalse(install_ui.BACKUP.exists())
 
+  def test_legacy_backup_remains_rollback_compatible(self):
+    with patch.object(install_ui, "FILES", install_ui.LEGACY_FILES):
+      legacy = {key: value for key, value in self.manifest.items() if key in install_ui.LEGACY_FILES}
+      (self.source / "manifest.json").write_text(json.dumps(legacy))
+      install_ui.install(self.source)
+    install_ui.rollback()
+    for relative, hashes in legacy.items():
+      self.assertEqual(install_ui.digest(self.checkout / relative), hashes["before"])
+
   def test_failed_service_install_rolls_back_native_files(self):
     install_ui.start_control.side_effect = OSError("read-only service location")
     with self.assertRaises(OSError):

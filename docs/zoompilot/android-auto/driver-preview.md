@@ -1,6 +1,7 @@
 # Driver camera preview
 
-Open **Device → Driver Camera Preview** in the projected settings. Automaxxing
+Open **Device → Driver Camera → PREVIEW** in the projected settings. This is the
+first Device row, accessible with the Commander. Automaxxing
 replaces that menu action's older 3X preview with a landscape adaptation of the
 C4 preview: mirrored/enhanced cabin camera, face box, eye and sunglasses
 indicators, animated driver pose, awareness percentage, and monitoring alerts.
@@ -34,6 +35,19 @@ An existing physical-display preview keeps ownership. Ignition transition
 releases the preview publisher without sending over the running driving-state
 publisher. Expired cabin frames are replaced with an unavailable message, and
 expired monitoring data hides the face/awareness overlays.
+
+Offroad detection checks fresh raw panda ignition as well as `deviceState`:
+the demo parameter blocks the normal started transition, so waiting for
+`deviceState.started` alone would prevent driving startup. The preview closes
+on ignition; it can be reopened once fresh Park/disengaged data is available.
+
+While the offroad driver-view parameter is set, hardwared keeps the model's
+CPU core and the speaker awake even when the local backlight is blank. Manager
+waits for core 7 to come online before launching offroad camera/monitoring
+processes. Clearing the lease restores the ordinary power policy. Onroad
+process startup is unchanged. Offroad demo monitoring accepts the policy's
+otherwise invalid envelope (driving inputs are absent), but still requires
+fresh valid driver-model output; parked onroad mode requires valid data throughout.
 
 `driver_preview_probe.py` exercises the actual Device-menu Commander target and
 camera preview on an offroad C4 using private handoff mailboxes. It checks live

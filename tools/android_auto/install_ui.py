@@ -12,10 +12,13 @@ from pathlib import Path
 import shutil
 import subprocess
 
-FILES = ("openpilot/system/ui/lib/application.py", "openpilot/system/ui/lib/display_handoff.py",
+LEGACY_FILES = ("openpilot/system/ui/lib/application.py", "openpilot/system/ui/lib/display_handoff.py",
          "openpilot/selfdrive/ui/ui.py", "openpilot/selfdrive/ui/ui_state.py",
          "openpilot/selfdrive/ui/mici/layouts/home.py", "openpilot/selfdrive/ui/automaxxing.py",
          "openpilot/selfdrive/ui/sunnypilot/mici/layouts/settings.py", "openpilot/selfdrive/ui/layouts/main.py")
+FILES = (*LEGACY_FILES, "openpilot/system/ui/lib/driver_preview.py", "openpilot/selfdrive/ui/layouts/settings/device.py",
+         "openpilot/selfdrive/ui/sunnypilot/layouts/settings/device.py", "openpilot/system/hardware/driver_view.py",
+         "openpilot/system/hardware/hardwared.py", "openpilot/system/manager/process_config.py")
 SERVICE = Path("/run/systemd/system/automaxxing-display.service")
 CHECKOUT = Path("/data/openpilot")
 BACKUP = Path("/data/automaxxing/native-ui-backup")
@@ -100,7 +103,7 @@ def install(source):
 
 def rollback(*, check_parked=True):
   manifest = json.loads((BACKUP / "manifest.json").read_text())
-  if set(manifest) != set(FILES):
+  if set(manifest) not in (set(FILES), set(LEGACY_FILES)):
     raise ValueError("Unexpected backup paths")
   for relative, hashes in manifest.items():
     if digest(CHECKOUT / relative) not in (hashes["before"], hashes["after"]):

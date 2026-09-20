@@ -9,7 +9,7 @@ from openpilot.cereal import log
 from openpilot.selfdrive.ui.mici.onroad.cabin_camera_dialog import BaseCabinCameraDialog
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, TextAlignment
-from openpilot.system.ui.lib.driver_preview import preview_allowed, preview_offroad
+from openpilot.system.ui.lib.driver_preview import preview_allowed, preview_offroad, monitoring_fresh
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.button import Button
@@ -80,12 +80,6 @@ class DriverPreview(BaseCabinCameraDialog):
     # selfdriveState publisher in the projection worker.
     pass
 
-  def _service_age(self, name, now):
-    sm = ui_state.sm
-    if not sm.alive[name] or not sm.valid[name]:
-      return float("inf")
-    return max(0., now - sm.recv_time[name], now - sm.logMonoTime[name] / 1e9)
-
   def _render(self, rect):
     self.camera_displayed = self.monitoring_displayed = False
     self.display_age = 0.
@@ -122,10 +116,12 @@ class DriverPreview(BaseCabinCameraDialog):
     else:
       self.display_age = camera_age
 
-    dm_age = max(self._service_age("driverMonitoringState", now), self._service_age("driverStateV2", now))
-    self.monitoring_displayed = self.camera_displayed and dm_age <= SOURCE_MAX_AGE
+    demo = offroad and ui_state.params.get_bool("IsDriverViewEnabled")
+    self.monitoring_displayed = self.camera_displayed and monitoring_fresh(ui_state.sm, now, demo=demo)
     driver_data = None
     if self.monitoring_displayed:
+      dm_age = max(max(0., now - ui_state.sm.recv_time[name], now - ui_state.sm.logMonoTime[name] / 1e9)
+                   for name in ("driverMonitoringState", "driverStateV2"))
       self.display_age = max(camera_age, dm_age)
       rl.rl_push_matrix()
       rl.rl_translatef(camera_rect.x, camera_rect.y, 0)

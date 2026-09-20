@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 from openpilot.system.ui.lib.display_handoff import HandoffClient, STATE_DIR, REQUEST_DIR, read_json, fresh
-from openpilot.system.ui.lib.driver_preview import DriverPreviewHost, preview_sound_publisher, preview_offroad, service_fresh
+from openpilot.system.ui.lib.driver_preview import DriverPreviewHost, preview_sound_publisher, preview_offroad, monitoring_fresh
 
 
 class NativeDisplayHandoff:
@@ -40,7 +40,7 @@ class NativeDisplayHandoff:
     events = self.client.tick(events, critical=critical)
     now = time.monotonic()
     offroad = preview_offroad(sm, now)
-    dm_fresh = service_fresh(sm, "driverMonitoringState", now, .35)
+    dm_fresh = monitoring_fresh(sm, now, demo=self.driver_preview.owner is not None)
     self.driver_preview.update(read_json(REQUEST_DIR / "driver-preview.json"), token=self.client.token,
                                offroad=offroad, projecting=self.client.mode == "project" and self.client.suppressed,
                                now=now, dm_state=sm["driverMonitoringState"] if dm_fresh else None)

@@ -5,12 +5,14 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 from openpilot.system.ui.lib.display_handoff import read_json, write_json
-from openpilot.system.ui.lib.driver_preview import DriverPreviewHost, DriverPreviewRequest, preview_allowed
+from openpilot.system.ui.lib.driver_preview import DriverPreviewHost, DriverPreviewRequest, preview_allowed, monitoring_fresh, preview_offroad
+from openpilot.system.hardware.driver_view import preview_core_ready, should_power_save
 
 
 class Subscriber(dict):
   def __init__(self):
     super().__init__(deviceState=SimpleNamespace(started=True),
+                     pandaStates=[SimpleNamespace(ignitionLine=False, ignitionCan=False)],
                      carState=SimpleNamespace(canValid=True, vEgo=0., gearShifter="park"),
                      selfdriveState=SimpleNamespace(enabled=False), carControl=SimpleNamespace(latActive=False, longActive=False))
     self.alive = dict.fromkeys(self, True)
@@ -20,6 +22,38 @@ class Subscriber(dict):
 
 
 class TestPreviewAccess(TestCase):
+  def test_raw_ignition_revokes_demo_before_device_started(self):
+    sm = Subscriber()
+    sm["deviceState"].started = False
+    self.assertTrue(preview_offroad(sm, 10.1))
+    for field in ("ignitionLine", "ignitionCan"):
+      setattr(sm["pandaStates"][0], field, True)
+      self.assertFalse(preview_offroad(sm, 10.1))
+      self.assertFalse(preview_allowed(sm, 10.1))
+      setattr(sm["pandaStates"][0], field, False)
+    sm.logMonoTime["pandaStates"] = 0
+    self.assertFalse(preview_offroad(sm, 10.1))
+
+  def test_offroad_demo_accepts_fresh_policy_without_missing_driving_inputs(self):
+    sm = Subscriber()
+    sm["deviceState"].started = False
+    sm.update(driverStateV2=object(), driverMonitoringState=object())
+    for name in ("driverStateV2", "driverMonitoringState"):
+      sm.alive[name] = sm.valid[name] = True
+      sm.recv_time[name] = 10.
+      sm.logMonoTime[name] = int(10e9)
+    sm.valid["driverMonitoringState"] = False
+    self.assertFalse(monitoring_fresh(sm, 10.1))
+    self.assertTrue(monitoring_fresh(sm, 10.1, demo=True))
+    sm["deviceState"].started = True
+    self.assertFalse(monitoring_fresh(sm, 10.1, demo=True))
+    sm["deviceState"].started = False
+    sm.valid["driverStateV2"] = False
+    self.assertFalse(monitoring_fresh(sm, 10.1, demo=True))
+    sm.valid["driverStateV2"] = True
+    sm.logMonoTime["driverMonitoringState"] = 0
+    self.assertFalse(monitoring_fresh(sm, 10.1, demo=True))
+
   def test_ignition_on_in_park_and_disengaged_can_preview(self):
     self.assertTrue(preview_allowed(Subscriber(), 10.1))
 
@@ -40,12 +74,28 @@ class TestPreviewAccess(TestCase):
         self.assertFalse(preview_allowed(sm, 10.1))
 
   def test_stale_or_invalid_services_fail_closed(self):
-    for name in Subscriber():
+    for name in ("deviceState", "carState", "selfdriveState", "carControl"):
       for field, value in [("alive", False), ("valid", False), ("recv_time", 0.), ("logMonoTime", 0)]:
         with self.subTest(name=name, field=field):
           sm = Subscriber()
           getattr(sm, field)[name] = value
           self.assertFalse(preview_allowed(sm, 10.1))
+
+
+class TestPreviewPower(TestCase):
+  def test_screen_off_preview_keeps_model_core_and_audio_awake(self):
+    self.assertTrue(should_power_save(False, 0., False))
+    self.assertFalse(should_power_save(False, 0., True))
+    self.assertFalse(should_power_save(True, 0., False))
+    self.assertFalse(should_power_save(False, 50., False))
+
+  def test_wait_for_model_core_before_starting_offroad_processes(self):
+    with patch.object(Path, "read_text", return_value="0\n"):
+      self.assertFalse(preview_core_ready())
+    with patch.object(Path, "read_text", return_value="1\n"):
+      self.assertTrue(preview_core_ready())
+    with patch.object(Path, "read_text", side_effect=OSError):
+      self.assertFalse(preview_core_ready())
 
 
 class Params:
