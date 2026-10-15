@@ -5,13 +5,18 @@ This file is part of zoompilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 
-from openpilot.cereal import custom
+from openpilot.cereal import custom, log
+from opendbc.car import structs
 from opendbc.car.hyundai.values import HyundaiFlags
 from opendbc.sunnypilot.car.mazda.values import MazdaFlagsSP
 from openpilot.common.test import OpenpilotTestCase
+from openpilot.sunnypilot.mads.helpers import MadsSteeringModeOnBrake
 from openpilot.sunnypilot.mads.tests.mads_harness import car_state, make_mads
 
 EventNameSP = custom.OnroadEventSP.EventName
+EventName = log.OnroadEvent.EventName
+ButtonType = structs.CarState.ButtonEvent.Type
+State = custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState
 
 
 class TestMainCruiseOffSwitch(OpenpilotTestCase):
@@ -61,3 +66,79 @@ class TestMainCruiseEngage(OpenpilotTestCase):
 
   def test_tja_button_keeps_main_out_of_lateral(self):
     assert not self._engages("mazda", sp_flags=MazdaFlagsSP.TJA_BUTTON)
+
+
+class TestMazdaStandbyOn(OpenpilotTestCase):
+  def test_boot_in_standby_waits_for_on_press(self, mocker):
+    mads, sd = make_mads(mocker, "mazda", prev_available=True)
+    mads.update(car_state(True))
+    assert not mads.enabled
+
+    mads.update(car_state(True, ButtonType.mainCruiseOn))
+    assert mads.enabled and mads.active
+    assert not sd.enabled
+    assert not sd.events.has(EventName.pcmEnable)
+    assert not sd.events.has(EventName.buttonEnable)
+
+    sd.events_sp.clear()
+    mads.update(car_state(False))
+    assert not mads.enabled
+
+  def test_on_only_enables_once(self, mocker):
+    mads, sd = make_mads(mocker, "mazda", prev_available=True)
+    mads.update(car_state(True, ButtonType.mainCruiseOn))
+    sd.events_sp.clear()
+    mads.update(car_state(True, ButtonType.mainCruiseOn))
+    assert mads.enabled
+    assert not sd.events_sp.has(EventNameSP.lkasEnable)
+    assert not sd.events_sp.has(EventNameSP.lkasDisable)
+
+  def test_other_buttons_and_on_release_do_not_enable(self, mocker):
+    for button in (None, ButtonType.mainCruise, ButtonType.cancel, ButtonType.accelCruise, ButtonType.resumeCruise):
+      mads, sd = make_mads(mocker, "mazda", prev_available=True)
+      mads.update_events(car_state(True, button))
+      assert not sd.events_sp.has(EventNameSP.lkasEnable), button
+
+    cs = car_state(True, ButtonType.mainCruiseOn)
+    cs.buttonEvents[0].pressed = False
+    mads.update_events(cs)
+    assert not sd.events_sp.has(EventNameSP.lkasEnable)
+
+  def test_requires_standby_and_main_engagement_setting(self, mocker):
+    for available, cruise_enabled, main_allowed in ((False, False, True), (True, True, True), (True, False, False)):
+      mads, sd = make_mads(mocker, "mazda", prev_available=available)
+      mads.main_enabled_toggle = main_allowed
+      cs = car_state(available, ButtonType.mainCruiseOn)
+      cs.cruiseState.enabled = cruise_enabled
+      mads.update_events(cs)
+      assert not sd.events_sp.has(EventNameSP.lkasEnable)
+
+  def test_tja_and_other_brands_keep_their_own_engagement(self, mocker):
+    for brand, sp_flags in (("mazda", MazdaFlagsSP.TJA_BUTTON), ("toyota", 0)):
+      mads, sd = make_mads(mocker, brand, prev_available=True, sp_flags=sp_flags)
+      mads.update_events(car_state(True, ButtonType.mainCruiseOn))
+      assert not sd.events_sp.has(EventNameSP.lkasEnable)
+
+  def test_mads_disabled_setting_is_respected(self, mocker):
+    mads, _ = make_mads(mocker, "mazda", prev_available=True)
+    mads.enabled_toggle = False
+    mads.update(car_state(True, ButtonType.mainCruiseOn))
+    assert not mads.enabled
+
+  def test_no_entry_still_blocks_engagement(self, mocker):
+    mads, sd = make_mads(mocker, "mazda", prev_available=True)
+    sd.events.add(EventName.commIssue)
+    mads.update(car_state(True, ButtonType.mainCruiseOn))
+    assert mads.state_machine.state == State.disabled
+    assert not mads.enabled
+
+  def test_on_with_brake_held_respects_steering_mode(self, mocker):
+    for mode, expected in ((MadsSteeringModeOnBrake.PAUSE, State.paused), (MadsSteeringModeOnBrake.DISENGAGE, State.disabled)):
+      mads, sd = make_mads(mocker, "mazda", prev_available=True)
+      mads.steering_mode_on_brake = mode
+      cs = car_state(True, ButtonType.mainCruiseOn)
+      cs.brakePressed = True
+      sd.events.add(EventName.pedalPressed)
+      mads.update(cs)
+      assert mads.state_machine.state == expected
+      assert not mads.active
