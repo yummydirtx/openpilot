@@ -193,6 +193,10 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.WARNING: NoEntryAlert("Pedal Pressed")
   },
 
+  EventNameSP.silentPedalPressed: {
+    ET.NO_ENTRY: Alert("", "", AlertStatus.normal, AlertSize.none, Priority.LOWEST, VisualAlert.none, AudibleAlert.none, 0.),
+  },
+
   EventNameSP.laneTurnLeft: {
     ET.WARNING: Alert(
       "Turning Left",

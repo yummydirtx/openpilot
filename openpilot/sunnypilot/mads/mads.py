@@ -168,6 +168,13 @@ class ModularAssistiveDrivingSystem:
           self.events_sp.add(EventNameSP.lkasEnable)
 
     for be in CS.buttonEvents:
+      # Main can persist across ignition. ON re-arms lateral from standby without
+      # requiring an ACC main edge or a longitudinal engagement.
+      if (self.main_enabled_toggle and not self.enabled and
+          CS.cruiseState.available and not CS.cruiseState.enabled and be.type == ButtonType.mainCruiseOn and be.pressed):
+        self.events_sp.add(EventNameSP.lkasEnable)
+        if self.steering_mode_on_brake == MadsSteeringModeOnBrake.PAUSE and (CS.brakePressed or CS.regenBraking):
+          self.events_sp.add(EventNameSP.silentPedalPressed)
       if be.type == ButtonType.cancel:
         if not self.selfdrive.enabled and self.selfdrive.enabled_prev:
           self.events_sp.add(EventNameSP.manualLongitudinalRequired)
@@ -191,7 +198,7 @@ class ModularAssistiveDrivingSystem:
           self.events_sp.add(EventNameSP.lkasDisable)
         else:
           # block lkasEnable if being sent, then send pedalPressedAlertOnly event
-          if self.events_sp.contains(EventNameSP.lkasEnable):
+          if self.events_sp.has(EventNameSP.lkasEnable):
             self.events_sp.remove(EventNameSP.lkasEnable)
             self.events_sp.add(EventNameSP.pedalPressedAlertOnly)
 
