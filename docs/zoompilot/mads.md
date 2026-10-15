@@ -40,24 +40,6 @@ already paused one frame later through the event), or for the pause-and-resume p
 
 Tests: `openpilot/sunnypilot/mads/tests/test_mads_steering_mode.py`, `TestEngageWithBrakeHeld`.
 
-## Mazda ON while ACC is already in standby
-
-MRCC main can persist across ignition. If it is already on when selfdrived becomes ready,
-there is no new main rising edge to engage MADS. Pressing ON in standby now requests lateral
-when MADS is disabled and `MadsMainCruiseAllowed` is enabled; cruise stays in standby. Startup
-alone, releasing ON, and pressing ON while MADS is already enabled do not request engagement.
-The existing no-entry and brake-mode checks still apply. Cars with a declared TJA button keep
-that button as their lateral switch.
-
-The Mazda port publishes `mainCruiseOn` from CRZ_BTNS MODE_Y alongside the existing combined
-`mainCruise` event. MODE_X alone is the KE's OFF press and must never request engagement.
-The panda reads the same MODE_Y press, gated by ACC main, through its existing MADS button-edge
-path so it can re-arm after the boot-time main edge expires through heartbeat mismatch.
-This requires the companion opendbc button-decoding and safety changes together.
-
-Tests: `TestMazdaStandbyOn` in the MADS main-cruise tests, `TestTjaButtonEvents` in Mazda
-carstate tests, and `TestMazdaMainOnMads` in Mazda safety tests.
-
 ## Constants
 
 | Name | Value | Where | Measurement |
