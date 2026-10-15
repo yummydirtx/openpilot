@@ -1,11 +1,11 @@
-# Use the zoompilot opendbc fork. Changes to this file make submodule sync refresh
-# legacy URLs.
+# Use the personal opendbc fork for this Mazda MADS test branch.
+# Changes to this file make submodule sync refresh legacy URLs.
 [submodule "panda"]
   path = panda
   url = https://github.com/sunnyhaibin/panda.git
 [submodule "opendbc"]
   path = opendbc_repo
-  url = https://github.com/zoompilot/opendbc.git
+  url = https://github.com/yummydirtx/opendbc.git
 [submodule "jetlink"]
   path = jetlink_repo
   url = https://github.com/zoompilot/jetlink.git
